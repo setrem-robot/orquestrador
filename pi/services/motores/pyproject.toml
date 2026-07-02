@@ -1,0 +1,20 @@
+[project]
+name = "motores"
+version = "0.1.0"
+description = "Controle dos motores de passo NEMA 23 do robô: executa comandos de movimento via GPIO a partir do barramento MQTT."
+requires-python = ">=3.11"
+dependencies = [
+    "gpiozero",
+    "lgpio",
+    "robo-common",
+]
+
+[project.scripts]
+motores = "motores.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

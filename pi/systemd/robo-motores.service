@@ -1,0 +1,32 @@
+# Copie para /etc/systemd/system/robo-motores.service e ajuste os caminhos
+# conforme onde o repo está (o install.sh faz isso automaticamente).
+#
+#   sudo cp pi/systemd/robo-motores.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now robo-motores
+#   journalctl -u robo-motores -f   # ver logs
+#
+# Roda como ROOT de propósito: precisa de acesso direto aos GPIOs via lgpio.
+# Requer no sistema: sudo apt install python3-gpiozero python3-lgpio -y
+
+[Unit]
+Description=Robo PIE V - Controle de motores de passo (MQTT -> GPIO)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/setrem/setrem-robot/pi
+ExecStart=/home/setrem/setrem-robot/pi/.venv/bin/motores
+Environment=MQTT_HOST=127.0.0.1
+Environment=MQTT_PORT=1883
+Environment=VELOCIDADE_PADRAO=60
+Environment=MOTOR1_INVERTIDO=false
+Environment=MOTOR2_INVERTIDO=false
+# Reinicia sempre que cair; espera 3s entre tentativas.
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

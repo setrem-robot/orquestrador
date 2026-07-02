@@ -40,7 +40,29 @@ nuvem e persistido**. Quem decide o que entra nesse prefixo é o orquestrador.
 Publicado pelo `serial_ingestor` com o JSON cru recebido do app, sem
 interpretação. Assinado pelo `orquestrador`.
 
-Formatos aceitos pelo orquestrador (campo `tipo` decide o roteamento):
+O orquestrador aceita dois formatos (ambos convivem sem conflito):
+
+**Formato compacto** — usado pelo app atual, letra única no campo `cmd`:
+
+```json
+{"cmd": "F"}
+{"cmd": "B"}
+{"cmd": "L"}
+{"cmd": "R"}
+{"cmd": "S"}
+```
+
+| `cmd` | Ação      |
+|-------|-----------|
+| `F`   | frente    |
+| `B`   | trás      |
+| `L`   | esquerda  |
+| `R`   | direita   |
+| `S`   | parar     |
+
+O orquestrador normaliza internamente para o formato expandido com velocidade padrão (60).
+
+**Formato expandido** — retrocompatível, campo `tipo` decide o roteamento:
 
 ```json
 {"tipo": "motor", "acao": "frente", "velocidade": 80}

@@ -4,8 +4,14 @@ Este módulo NÃO conhece MQTT: ele só transforma um comando (dict já
 desserializado) numa lista de publicações (tópico, payload). Isso o torna
 trivial de testar e mantém a lógica de decisão separada da infraestrutura.
 
-Contrato de entrada (o que o app envia, via Bluetooth -> ESP32 -> serial_ingestor):
+Formatos de entrada aceitos (Bluetooth -> ESP32 -> serial_ingestor):
 
+  Formato compacto (app atual):
+    {"cmd": "F"}   frente     {"cmd": "B"}   trás
+    {"cmd": "L"}   esquerda   {"cmd": "R"}   direita
+    {"cmd": "S"}   parar
+
+  Formato expandido (retrocompatível):
     {"tipo": "motor",  "acao": "frente", "velocidade": 80}
     {"tipo": "voz",    "texto": "olá, tudo bem?"}
     {"tipo": "parada_emergencia"}
@@ -31,6 +37,15 @@ ACOES_MOTOR_VALIDAS = {"frente", "tras", "esquerda", "direita", "parar"}
 
 # Velocidade padrão quando o app manda uma direção sem informar intensidade.
 VELOCIDADE_PADRAO = 60
+
+# Formato compacto do app: letra única -> ação de motor.
+_CMD_PARA_ACAO: dict[str, str] = {
+    "F": "frente",
+    "B": "tras",
+    "L": "esquerda",
+    "R": "direita",
+    "S": "parar",
+}
 
 
 def _limitar_velocidade(valor: Any) -> int:
@@ -98,6 +113,15 @@ def rotear(comando: dict[str, Any]) -> list[Publicacao]:
     if not isinstance(comando, dict):
         logger.warning("Comando ignorado (não é objeto JSON): %r", comando)
         return []
+
+    # Formato compacto {"cmd": "F"}: normaliza para ação de motor antes de rotear.
+    cmd = comando.get("cmd")
+    if cmd is not None:
+        acao = _CMD_PARA_ACAO.get(str(cmd).upper())
+        if acao is None:
+            logger.warning("Comando compacto desconhecido: %r", cmd)
+            return []
+        return _rotear_motor({"acao": acao, "velocidade": VELOCIDADE_PADRAO})
 
     tipo = comando.get("tipo")
     rota = _ROTAS.get(tipo)
