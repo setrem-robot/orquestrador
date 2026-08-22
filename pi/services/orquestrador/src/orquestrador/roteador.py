@@ -18,16 +18,9 @@ Formatos de entrada aceitos (Bluetooth -> ESP32 -> serial_ingestor):
 
 Veja docs/contrato-mqtt.md para a especificação completa.
 
-## Por que uma classe por tipo de comando
-
-Cada tipo de comando ("motor", "voz", "wifi", ...) é uma subclasse de
-[ComandoRoteavel], não uma função solta. Isso não é só estética:
-`rotear()` (a função no fim deste módulo) despacha para
-`_ROTAS[tipo].rotear(comando)` sem nunca saber QUAL subclasse está do outro
-lado — é despacho polimórfico de verdade. Adicionar um comando novo é criar
-uma subclasse e registrar uma instância em `_ROTAS`; `rotear()` nunca muda.
-Isso é o Command Pattern: cada comando encapsula sua própria regra de
-validação e tradução, atrás da mesma interface.
+Cada tipo de comando é uma subclasse de [ComandoRoteavel] (Command Pattern):
+adicionar um comando novo é criar a subclasse e registrar uma instância em
+`_ROTAS` — `rotear()`, no fim do módulo, nunca muda.
 """
 
 from __future__ import annotations
@@ -57,12 +50,8 @@ _CMD_PARA_ACAO: dict[str, str] = {
 
 
 class ComandoRoteavel(ABC):
-    """Uma família de comando do app: sabe traduzir o dict recebido em
-    publicações MQTT (tópico, payload).
-
-    Cada subclasse cuida de UM valor de `comando["tipo"]`. Nenhum código fora
-    deste módulo instancia ou conhece as subclasses — elas só existem
-    registradas em `_ROTAS`, atrás desta interface comum.
+    """Traduz o dict de um comando em publicações MQTT (tópico, payload).
+    Cada subclasse cuida de um valor de `comando["tipo"]`.
     """
 
     @abstractmethod
