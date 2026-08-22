@@ -12,7 +12,7 @@ Toda mensagem é **JSON em uma linha**. A raiz de todos os tópicos é `robo`.
 
 ```
 App (celular)
-   │  Bluetooth SPP (JSON por linha)
+   │  BLE (JSON por linha)
    ▼
 ESP32  ──(valida JSON, repassa por serial)──►  Pi
                                                  │
