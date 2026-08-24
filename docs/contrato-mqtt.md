@@ -77,6 +77,32 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
 - Comandos desconhecidos ou malformados são descartados (logados, não derrubam
   o serviço).
 
+### Movimento é repetido, e silêncio quer dizer "pare"
+
+Um comando de movimento **não vale para sempre**. Enquanto o dedo está no botão,
+o app repete o mesmo comando a cada **300 ms**; se o serviço de motores ficar
+**1 s** sem receber nada, ele para os motores por conta própria e publica em
+`robo/motores/status` com `"motivo": "sem_comando"`.
+
+Isso existe porque o comando de parar viaja pelo mesmo caminho que pode quebrar.
+O app manda `F` quando o dedo desce e `S` quando sobe; se a conexão morrer entre
+os dois — celular fora de alcance, sem bateria, app fechado, ESP32 travado, cabo
+serial solto —, o `S` nunca chega e o robô fica andando sozinho. Repetindo o
+comando, a ausência dele passa a ser um sinal em si.
+
+São três camadas independentes, e cada uma cobre o que a anterior não alcança:
+
+| Camada | Cobre | Onde |
+|---|---|---|
+| App repete o comando | qualquer falha no caminho, inclusive as de baixo | `robot_connection.dart::send` |
+| ESP32 manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `esp32_ble_bridge.ino::onDisconnect` |
+| Motores param sem comando por 1 s | ESP32 travado, serial solta, Pi sem receber | `motores/vigia.py` |
+
+`COMANDO_TIMEOUT_S=0` desliga a terceira camada. **Só faça isso com um app que
+não repete o comando** — do contrário o robô para no meio de todo movimento. Um
+app antigo com um Pi atualizado tem exatamente esse sintoma, e o log do serviço
+`motores` diz isso com todas as letras.
+
 > **Tudo entra por um único caminho.** O app só tem um canal Bluetooth: o
 > ESP32. Não há Bluetooth no Pi. Logo, até a credencial de Wi-Fi viaja como um
 > comando comum (app → ESP32 → serial → `serial_ingestor`).

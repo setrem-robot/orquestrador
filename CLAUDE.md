@@ -28,6 +28,22 @@ BLE (padrão Nordic UART Service, no topo do `.ino`) **precisam bater** com
 JSON e o formato de mensagem (`{"cmd":"F"}\n`) continuam idênticos — só o
 transporte mudou.
 
+## Segurança: movimento é repetido, silêncio é "pare"
+
+Um comando de movimento não vale para sempre. O app repete o mesmo comando a
+cada 300 ms enquanto o dedo está no botão; `motores/vigia.py` para os motores se
+ficar 1 s sem receber nada. Antes disso, uma conexão que morresse com o dedo no
+botão deixava o robô andando sozinho — o `S` do "dedo levantou" nunca chegava.
+
+São três camadas independentes (app repete, ESP32 avisa ao perder o BLE, motores
+vigiam o silêncio); o quadro completo está em `docs/contrato-mqtt.md`. Ao mexer
+em qualquer ponto desse caminho, pergunte **o que acontece se isto morrer no meio
+de um movimento** — e prefira a resposta que para o robô.
+
+`vigia.py` é lógica pura, sem GPIO e sem relógio próprio (quem chama informa o
+instante): 12 testes em `pi/services/motores/tests/`, sem hardware e sem esperar
+em tempo real.
+
 ## `roteador.py` é Command Pattern, não dict de funções
 
 `pi/services/orquestrador/src/orquestrador/roteador.py` foi refatorado para
