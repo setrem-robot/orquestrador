@@ -147,9 +147,17 @@ powershell -ExecutionPolicy Bypass -File .\cloud\scripts\liberar-portas-wsl.ps1
 ```
 
 Ele libera a 8000 (a API, para o app) e a 1883 (o broker, para apontar o Pi
-para cá), confere que a API respondeu pelo IP da rede e imprime o endereço para
-o app. Rodar duas vezes não duplica nada. Para desfazer, o mesmo script com
+para cá). Rodar duas vezes não duplica nada. Para desfazer, o mesmo script com
 `-Remover`.
+
+> **Não tente confirmar pelo Windows.** No modo espelhado, o próprio Windows
+> não alcança o WSL pelo IP da rede — nem pelo da LAN, nem por um do Tailscale;
+> só por `127.0.0.1`. Isso é do espelhamento, não do firewall, e foi medido
+> nesta máquina com as regras já criadas e funcionando. Um `Invoke-WebRequest`
+> dali dá timeout e faz parecer que nada mudou.
+>
+> **Quem responde de verdade é o celular.** Abra o app, ponha o endereço e o
+> token, e toque em *Salvar e testar* — é o único teste que vale.
 
 Se preferir fazer à mão:
 
