@@ -208,7 +208,11 @@ else
     info ".env já existe; mantendo"
     # Um .env de produção aqui subiria containers com as senhas da VM na sua
     # máquina, e — pior — faria o app apontar para o token errado sem avisar.
-    if ! grep -q "API_TOKEN=atlas-token-de-teste-local" .env; then
+    #
+    # O marcador, e não o token: trocar o `API_TOKEN` de teste por um sorteado
+    # é coisa recomendada de se fazer assim que a API sai para a internet pelo
+    # túnel, e um aviso que dispara justamente aí ensinaria a ignorá-lo.
+    if ! grep -q "^# ATLAS_AMBIENTE=local" .env; then
         info "[aviso] este .env não parece o de teste; conferindo mesmo assim"
     fi
 fi

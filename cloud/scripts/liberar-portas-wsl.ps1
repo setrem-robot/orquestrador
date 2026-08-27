@@ -179,10 +179,19 @@ if ($Espelhado) {
     }
 }
 
+# Lido do .env, nunca repetido aqui: um literal neste arquivo continuaria
+# sendo impresso depois de alguém sortear um token novo, e a pessoa digitaria
+# no app um token que a API já recusa — errando no lugar mais difícil de
+# desconfiar, que é a instrução na tela.
+$envPath = Join-Path (Split-Path $PSScriptRoot -Parent) '.env'
+$token = if (Test-Path $envPath) {
+    ((Get-Content $envPath | Where-Object { $_ -match '^API_TOKEN=' }) -split '=', 2)[1]
+} else { '(rode ./cloud/scripts/ambiente-local.sh primeiro)' }
+
 Write-Host ''
 Write-Host '  No app, em "Dados do robô" -> engrenagem:' -ForegroundColor Green
 Write-Host "      Endereço:  http://${ipLan}:8000"
-Write-Host '      Token:     atlas-token-de-teste-local'
+Write-Host "      Token:     ${token}"
 Write-Host ''
 Write-Host '  O celular precisa estar no mesmo Wi-Fi que esta máquina.'
 Pausar
