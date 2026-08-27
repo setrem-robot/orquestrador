@@ -148,3 +148,152 @@ Escolha um. Num Pi que roda a face, a escuta e os motores, o do apt é o mais
 simples; nesse caso a configuração que vale é
 `pi/mosquitto/apt/robo.conf.example` (fila, persistência e listener), e o
 `docker-compose.yml` do Pi não deve subir.
+
+---
+
+# A API de leitura (o app e a landing page)
+
+Até aqui a telemetria só ia numa direção: do robô para o banco. A API é o
+caminho de volta — o app e a landing page leem por ela. **Só leitura**: quem
+grava continua sendo o `ingestor`.
+
+```
+robô ──MQTT──► bridge ──► broker remoto ──► ingestor ──► TimescaleDB
+                                                              │
+                                           app ◄── API ◄──────┘
+                                  landing page ◄──┘
+```
+
+Um celular não fala Postgres, e abrir o banco para a internet para que ele
+falasse seria trocar um buraco por um bem maior.
+
+## 1. Variáveis novas no `.env`
+
+```bash
+# O token que o app manda em `Authorization: Bearer`. Gere um de verdade:
+openssl rand -hex 32
+```
+
+Preencha no `cloud/.env`:
+
+| Variável | Para que serve |
+|---|---|
+| `API_TOKEN` | acesso do app a **todo** o histórico, coordenadas exatas incluídas |
+| `API_PGUSER` / `API_PGPASSWORD` | usuário do banco **só de leitura** que a API usa |
+| `CORS_ORIGENS` | o domínio da landing page (vazio = nenhum navegador chama a API) |
+| `PUBLICO_HABILITADO` | liga as rotas sem token (`true` por padrão) |
+| `PRECISAO_GPS_PUBLICA` | casas decimais nas rotas públicas (`4` ≈ 11 m) |
+
+## 2. O usuário de leitura
+
+A API é a única peça exposta à internet. Se ela usasse o usuário do `ingestor`,
+uma falha numa rota teria permissão para apagar meses de telemetria — com este
+usuário, o pior caso é ler o que já era para ser lido.
+
+Num banco **novo**, `timescaledb/init/02_usuario_leitura.sh` o cria sozinho.
+Num banco **que já existe**, aplique uma vez:
+
+```bash
+docker exec -it timescaledb psql -U robo -d robo
+```
+```sql
+CREATE ROLE robo_leitura LOGIN PASSWORD 'a-senha-do-.env';
+GRANT CONNECT ON DATABASE robo TO robo_leitura;
+GRANT USAGE ON SCHEMA public TO robo_leitura;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO robo_leitura;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO robo_leitura;
+```
+
+## 3. Subir
+
+```bash
+cd cloud
+docker compose up -d --build api
+curl http://127.0.0.1:8000/saude
+```
+
+Resposta esperada:
+
+```json
+{"ok": true, "banco": true, "token_configurado": true, "publico": true}
+```
+
+`token_configurado: false` significa que **todas** as rotas do app vão recusar
+com 401 — a API não abre a porta sem token, porque servir o histórico inteiro a
+quem descobrir o endereço é o modo de falhar que ninguém percebe até ser tarde.
+
+## 4. Publicar no seu domínio (Cloudflare Tunnel)
+
+Assim a VM **não precisa de IP público nem de porta aberta no firewall do
+LARCC**: o túnel abre a conexão de dentro para fora, e a Cloudflare passa a
+entregar as requisições por ela. O HTTPS válido vem junto e renovado.
+
+1. No painel: **Zero Trust → Networks → Tunnels → Create a tunnel →
+   Cloudflared**. Dê um nome (`atlas-api`).
+2. Copie o token que ele mostra para `TUNNEL_TOKEN` no `.env`.
+3. Ainda no painel, em **Public Hostnames**, aponte
+   `api.seudominio.com.br` → `http://api:8000`.
+   O nome `api` é o do serviço no compose: os dois containers estão na mesma
+   rede do Docker, então o túnel o alcança sem passar pela rede da VM.
+4. Suba:
+
+```bash
+docker compose --profile tunel up -d
+curl https://api.seudominio.com.br/saude
+```
+
+## 5. As rotas
+
+Todas as de `/v1/` exigem `Authorization: Bearer $API_TOKEN`.
+
+| Rota | O que devolve |
+|---|---|
+| `GET /saude` | se a API fala com o banco (sem token; é o healthcheck) |
+| `GET /v1/estado` | a última leitura de cada tipo, com a idade já calculada |
+| `GET /v1/trajeto?desde=&ate=&limite=` | pontos do percurso, só com sinal de GPS válido |
+| `GET /v1/serie/{tipo}?campo=&intervalo=` | média de um campo por faixa de tempo |
+| `GET /v1/eventos?tipo=&limite=&antes_de=` | as mensagens cruas, paginadas por instante |
+| `GET /v1/publico/resumo` | contagem por tipo (sem token) |
+| `GET /v1/publico/trajeto` | percurso com posição arredondada (sem token) |
+
+```bash
+TOKEN=$(grep ^API_TOKEN cloud/.env | cut -d= -f2)
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/v1/estado | jq
+```
+
+`intervalo` aceita `1m`, `5m`, `15m`, `1h`, `6h`, `1d`. É lista fechada porque
+ele entra no texto do `time_bucket` — montá-lo a partir do que o cliente
+digitou seria injeção de SQL com outro nome.
+
+### Duas portas, servindo coisas diferentes
+
+A landing page é uma página estática: qualquer token no JavaScript dela é
+legível por quem abrir o inspetor. Em vez de fingir que seria segredo, as rotas
+`/v1/publico/` não pedem nada e **servem menos** — só o resumo e o trajeto com a
+posição arredondada para ~11 metros. Dá para ver o robô andando pelo campus, e
+não para saber em que sala ele está.
+
+## 6. Ver as telas antes de o robô existir
+
+O GPS ainda não está montado, e ninguém publica bateria. Sem dados, o app
+mostra tela vazia — e tela vazia não distingue "o mapa está errado" de "não há
+o que mostrar". Este script separa as duas coisas:
+
+```bash
+python3 cloud/scripts/semear-demonstracao.py --horas 6
+python3 cloud/scripts/semear-demonstracao.py --limpar
+```
+
+Ele gera um trajeto em volta do campus com velocidade coerente, uma bateria que
+só cai, comandos de motor que combinam com a curva, e quedas de Wi-Fi. Tudo
+marcado com `"demo": true` no payload — é o que faz `--limpar` nunca tocar em
+telemetria de verdade.
+
+## 7. Testes
+
+A parte que erra por descuido — limite não saturado, janela invertida, campo
+entrando no SQL sem validação — é testável sem banco e sem container:
+
+```bash
+cd cloud/api && python3 -m unittest discover -s tests
+```

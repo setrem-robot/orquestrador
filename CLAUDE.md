@@ -15,8 +15,45 @@ essa documentação não cobre.
   (`pi/scripts/install.sh`) e rodando como serviço systemd: `serial_ingestor`,
   `orquestrador` (o roteador), `motores`, `gps`, `wifi`. Compartilham a lib
   `robo_common` (tópicos MQTT + `MqttService`).
-- **`cloud/`** — Mosquitto remoto + `ingestor` (Python) + TimescaleDB via
-  Docker Compose. Só recebe o que está sob `robo/telemetria/#`.
+- **`cloud/`** — Mosquitto remoto + `ingestor` + TimescaleDB + **`api`** +
+  **`cloudflared`**, via Docker Compose. Os três primeiros são o caminho de ida
+  (robô → banco); os dois últimos são o de volta, que faltava: um celular não
+  fala Postgres, e abrir o banco para a internet para que ele falasse seria
+  trocar um buraco por um bem maior.
+- **`site/`** — a landing page, HTML/CSS/JS puros, publicada pelo Cloudflare
+  Pages. Consome as rotas **públicas** da API (sem token, e servindo menos).
+
+## A API é só de leitura, e tem duas portas
+
+`cloud/api/` (FastAPI) nunca escreve — quem grava é o `ingestor`. Ela roda com
+um usuário do banco separado, só com `SELECT` (`robo_leitura`): a API é a única
+peça exposta à internet, e um bug numa rota não pode ser capaz de apagar meses
+de telemetria.
+
+- `/v1/...` exige `Authorization: Bearer`, e serve tudo.
+- `/v1/publico/...` não exige nada e serve menos — o resumo, e o trajeto com a
+  posição arredondada para ~11 m. A landing page é estática: qualquer token no
+  JavaScript dela seria legível por quem abrisse o inspetor, então em vez de
+  fingir que é segredo, aquela porta serve menos.
+
+`cloud/api/app/consultas.py` devolve `(sql, parametros)` e **não toca no
+banco** — mesmo desenho de `roteador.py` e `motores/cinematica.py`, pelo mesmo
+motivo: o que erra por descuido (limite não saturado, campo entrando no SQL sem
+validação) fica testável sem infraestrutura. 27 testes:
+
+```bash
+cd cloud/api && python3 -m unittest discover -s tests
+```
+
+**O `intervalo` e o `campo` são interpolados no SQL** — `time_bucket` e o
+operador `->>` não aceitam parâmetro para eles. Por isso o primeiro vem de uma
+lista fechada (`INTERVALOS`) e o segundo passa por `campo_valido()`. Ao mexer
+ali, essa validação é a única coisa entre o cliente e uma injeção.
+
+**Sem dados para testar?** `cloud/scripts/semear-demonstracao.py` enche o banco
+com um trajeto plausível em volta do campus, bateria descarregando e comandos
+de motor coerentes com a curva. Tudo marcado com `"demo": true`, que é o que
+faz `--limpar` nunca tocar em telemetria de verdade.
 
 ## BLE, não Bluetooth Classic
 
