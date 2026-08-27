@@ -13,7 +13,10 @@ Aqui você encontra todas as documentações, separadas por tipo/ambiente.
 
 ## Cloud
 
-- [**Setup no Ambiente Cloud**](./setup-cloud.md);
+- [**Setup no Ambiente Cloud**](./setup-cloud.md): o Mosquitto remoto, o
+  TimescaleDB, o ingestor e a API de leitura, na VM do LARCC.
+- [**Ambiente local**](./ambiente-local.md): a mesma nuvem rodando na sua
+  máquina, com os mesmos arquivos — e como levar de lá para a VM depois.
 
 
 ## ESP32
