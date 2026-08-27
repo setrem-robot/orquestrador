@@ -242,6 +242,39 @@ docker compose --profile tunel up -d
 curl https://api.seudominio.com.br/saude
 ```
 
+### Se der 502
+
+Duas causas, e a diferença entre elas está em **quem atende**.
+
+**O hostname aponta para `localhost:8000`.** Dentro do container do conector,
+`localhost` é ele mesmo, e ali não há nada escutando. É o padrão que o painel
+sugere, e o único certo aqui é `api:8000`. Confira no log do próprio conector,
+que imprime a configuração que recebeu:
+
+```bash
+docker compose logs cloudflared | grep 'Updated to new configuration'
+```
+
+**Há mais de um conector no mesmo túnel.** Todos recebem a *mesma*
+configuração, e a Cloudflare reparte o tráfego entre eles — então um conector
+fora da rede do compose (instalado no Raspberry Pi, ou por
+`cloudflared service install` numa máquina qualquer) não resolve o nome `api` e
+devolve 502 na fatia dele. O sintoma engana: funciona de forma intermitente, o
+que parece instabilidade de rede.
+
+Para saber se é isso, peça o `/saude` algumas vezes e veja se **todas** as
+requisições aparecem no log da API:
+
+```bash
+for i in 1 2 3 4 5; do curl -s -o /dev/null "https://api.seudominio.com.br/saude?n=$i"; done
+docker compose logs --since 1m api | grep -c 'saude?n='
+```
+
+Menos de cinco, há outro conector. Apague os que sobram em **Tunnels → o túnel
+→ Connectors**, guardando o do compose — o ID dele sai em
+`docker compose logs cloudflared | grep 'Generated Connector ID'`, e muda a
+cada vez que o container sobe.
+
 ## 5. As rotas
 
 Todas as de `/v1/` exigem `Authorization: Bearer $API_TOKEN`.
