@@ -1,0 +1,49 @@
+# Atualização automática de dependências, com aviso de vulnerabilidade.
+#
+# O Dependabot abre um PR quando uma dependência tem versão nova — e, o que mais
+# importa aqui, quando uma versão em uso tem falha de segurança conhecida. Sem
+# isto, uma CVE numa biblioteca ficaria invisível até alguém tropeçar nela.
+#
+# Este repositório tem Python em três lugares (a API e os serviços do Pi), mais
+# as imagens do Docker Compose e as próprias GitHub Actions. Cada bloco abaixo é
+# um desses ecossistemas.
+version: 2
+updates:
+  # --- API da nuvem (requirements.txt) ---
+  - package-ecosystem: "pip"
+    directory: "/cloud/api"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # --- serviços do Raspberry Pi (um pyproject por serviço) ---
+  - package-ecosystem: "pip"
+    directory: "/pi/services/motores"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+  - package-ecosystem: "pip"
+    directory: "/pi/services/orquestrador"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+
+  # --- imagens do Docker Compose (timescaledb, mosquitto, cloudflared) ---
+  - package-ecosystem: "docker-compose"
+    directory: "/cloud"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+
+  # --- as próprias GitHub Actions, se um dia houver workflows ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
