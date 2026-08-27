@@ -37,6 +37,11 @@ Confira com:
 docker run --rm hello-world
 ```
 
+> **Acabou de instalar e não quer reiniciar agora?** O script detecta que a
+> sessão ainda não entrou no grupo `docker` e segue com `sudo`, avisando. O
+> `wsl --shutdown` continua sendo o certo — só não precisa ser antes do
+> primeiro teste.
+
 ## 2. Subir
 
 ```bash
@@ -124,6 +129,16 @@ New-NetFirewallRule -DisplayName "Atlas API" -Direction Inbound `
 `-Profile Private` de propósito: a regra vale na sua rede de casa e na da
 faculdade se ela estiver marcada como privada, e não numa rede pública
 qualquer.
+
+### Testar a landing page junto
+
+```bash
+cd site && python3 -m http.server 8080
+```
+
+Abra `http://localhost:8080`. Servida de um endereço local, a página aponta
+sozinha para a API do ambiente de testes — não é preciso editar o `config.js`
+(e, portanto, não há o que lembrar de desfazer antes de publicar).
 
 ## 4. Dados para ver
 
