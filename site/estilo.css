@@ -1,0 +1,296 @@
+/* Paleta da Setrem (#00BF6F, Pantone 7480 C) sobre fundo escuro — a mesma do
+   aplicativo, para o site e o app parecerem a mesma coisa. O azul institucional
+   (#002F6C) não aparece como destaque: no preto ele tem contraste de 1,6:1,
+   abaixo do mínimo de 4,5:1 exigido para texto. */
+:root {
+  --verde: #00bf6f;
+  --verde-claro: #24ffc2;
+  --fundo: #0a0e1a;
+  --superficie: #131929;
+  --borda: rgba(255, 255, 255, 0.08);
+  --texto: #ffffff;
+  --texto-fraco: rgba(255, 255, 255, 0.62);
+  --texto-tenue: rgba(255, 255, 255, 0.38);
+  --largura: 1080px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--verde); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3 { line-height: 1.15; margin: 0; }
+
+/* --- topo ---------------------------------------------------------------- */
+.topo {
+  position: sticky;
+  top: 0;
+  z-index: 500; /* acima do mapa: o Leaflet usa até 400 nos painéis dele */
+  backdrop-filter: blur(12px);
+  background: rgba(10, 14, 26, 0.82);
+  border-bottom: 1px solid var(--borda);
+}
+
+.faixa {
+  max-width: var(--largura);
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.marca {
+  font-weight: 900;
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, var(--verde-claro), var(--verde));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.topo nav { display: flex; gap: 20px; flex-wrap: wrap; }
+.topo nav a { color: var(--texto-fraco); font-size: 14px; }
+.topo nav a:hover { color: var(--texto); text-decoration: none; }
+
+/* --- herói --------------------------------------------------------------- */
+main { max-width: var(--largura); margin: 0 auto; padding: 0 24px; }
+
+.heroi { padding: 88px 0 72px; }
+
+.sobrelinha {
+  color: var(--verde);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 0 0 20px;
+}
+
+.heroi h1 {
+  font-size: clamp(2.2rem, 6vw, 3.8rem);
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  max-width: 16ch;
+}
+
+.heroi h1 em {
+  font-style: normal;
+  background: linear-gradient(90deg, var(--verde-claro), var(--verde));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.chamada {
+  color: var(--texto-fraco);
+  font-size: 1.05rem;
+  max-width: 62ch;
+  margin: 24px 0 32px;
+}
+
+.acoes { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.botao {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--borda);
+  color: var(--texto);
+  font-weight: 600;
+  font-size: 15px;
+}
+.botao:hover { text-decoration: none; border-color: var(--verde); }
+
+.botao.primario {
+  background: var(--verde);
+  border-color: var(--verde);
+  color: var(--fundo);
+}
+.botao.primario:hover { background: var(--verde-claro); border-color: var(--verde-claro); }
+
+/* --- ao vivo ------------------------------------------------------------- */
+section { padding: 56px 0; border-top: 1px solid var(--borda); }
+
+.cabecalho-secao {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+h2 { font-size: clamp(1.5rem, 3.5vw, 2.1rem); font-weight: 800; letter-spacing: -0.5px; }
+
+.subtitulo { color: var(--texto-fraco); max-width: 62ch; margin: 14px 0 32px; }
+
+.estado {
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--borda);
+  color: var(--texto-tenue);
+}
+.estado.carregando { color: var(--texto-tenue); }
+.estado.vivo { color: var(--verde); border-color: rgba(0, 191, 111, 0.4); }
+.estado.parado { color: #ffb74d; border-color: rgba(255, 183, 77, 0.4); }
+.estado.erro { color: #ef5350; border-color: rgba(239, 83, 80, 0.4); }
+
+/* O ponto piscando só aparece quando o robô está de fato publicando agora. */
+.estado.vivo::before {
+  content: "";
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--verde);
+  margin-right: 8px;
+  vertical-align: middle;
+  animation: pulsar 2s ease-in-out infinite;
+}
+
+@keyframes pulsar {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* Respeita quem pediu menos movimento no sistema — a animação é enfeite, e
+   enfeite não vale desconforto. */
+@media (prefers-reduced-motion: reduce) {
+  .estado.vivo::before { animation: none; }
+}
+
+.painel { display: grid; gap: 20px; grid-template-columns: 1fr; }
+
+@media (min-width: 860px) {
+  .painel { grid-template-columns: 1.6fr 1fr; align-items: start; }
+}
+
+.mapa {
+  height: 380px;
+  border-radius: 16px;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  overflow: hidden;
+  /* O mapa da OSM é claro e o site é escuro. Escurecer o tile apagaria as ruas,
+     que é o que dá sentido ao trajeto; a borda arredondada já resolve o
+     encontro entre os dois. */
+}
+
+.numeros { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+
+.numeros li {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.numeros .rotulo {
+  display: block;
+  color: var(--texto-tenue);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.numeros .valor {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.numeros .detalhe { display: block; color: var(--texto-tenue); font-size: 12px; }
+
+.aviso {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  padding: 24px;
+  color: var(--texto-fraco);
+  margin: 0;
+}
+
+.rodape-secao { color: var(--texto-tenue); font-size: 13px; margin: 20px 0 0; max-width: 62ch; }
+
+/* --- partes -------------------------------------------------------------- */
+.cartoes { display: grid; gap: 18px; grid-template-columns: 1fr; }
+
+@media (min-width: 760px) {
+  .cartoes { grid-template-columns: repeat(3, 1fr); }
+}
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.cartao .icone { font-size: 26px; margin-bottom: 12px; }
+.cartao h3 { font-size: 1.15rem; margin-bottom: 10px; }
+.cartao p { color: var(--texto-fraco); font-size: 14px; margin: 0 0 16px; }
+.cartao a { font-size: 14px; font-weight: 600; }
+
+/* --- caminho do dado ----------------------------------------------------- */
+.passos { counter-reset: passo; list-style: none; padding: 0; margin: 28px 0 0; }
+
+.passos li {
+  counter-increment: passo;
+  position: relative;
+  padding: 0 0 22px 46px;
+  color: var(--texto-fraco);
+  max-width: 72ch;
+}
+
+.passos li::before {
+  content: counter(passo);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--verde);
+  color: var(--verde);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* A linha ligando os passos, menos a do último. */
+.passos li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 34px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--borda);
+}
+
+.passos strong { color: var(--texto); }
+
+/* --- rodapé -------------------------------------------------------------- */
+footer {
+  border-top: 1px solid var(--borda);
+  padding: 32px 24px 48px;
+  text-align: center;
+  color: var(--texto-fraco);
+  font-size: 14px;
+}
+
+footer .miudo { color: var(--texto-tenue); font-size: 12px; }

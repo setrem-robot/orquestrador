@@ -39,3 +39,33 @@ notification_topic robo/sistema/bridge_status
 # Backoff de reconexão: começa em 5s, vai até no máximo 30s.
 restart_timeout 5 30
 keepalive_interval 30
+
+# --- O que acontece enquanto o LARCC está fora de alcance ---
+# `cleansession false` acima é metade da história: é ele que faz o broker local
+# GUARDAR o que não conseguiu subir, em vez de descartar. A outra metade é o
+# tamanho dessa fila, que é global e está em `mosquitto.conf` — sem mexer nela,
+# o padrão de 1000 mensagens dá dezessete minutos de queda antes de o histórico
+# começar a ter buracos.
+#
+# Como o robô sai de campo, ficar sem rede é rotina, e não exceção: a fila é o
+# que separa "a telemetria atrasou" de "a telemetria daquela tarde não existe".
+#
+# Não tente reenviar à mão o que ficou para trás: o `ingestor` grava usando o
+# campo `ts` do payload, e não o instante em que a mensagem chegou. O que subiu
+# tarde entra no banco na hora certa.
+
+# Ao reconectar, não refaz o unsubscribe do que já estava inscrito — poupa uma
+# ida e volta em cada reconexão, e numa rede instável são muitas.
+bridge_attempt_unsubscribe false
+
+# --- Ligação cifrada (recomendado se a VM está na internet aberta) ---
+# Sem isto, `remote_password` viaja em texto claro entre o robô e o LARCC —
+# aceitável dentro da VPN da instituição, não pela internet. Para ligar: aponte
+# `address` para a porta 8883, exponha 8883 no compose da nuvem e descomente:
+#
+#   bridge_cafile /mosquitto/config/certs/ca.crt
+#   bridge_insecure false
+#
+# `bridge_insecure false` é o que faz a verificação do certificado valer de
+# fato; com `true`, a conexão é cifrada mas aceita qualquer servidor — o que
+# protege contra quem escuta, e não contra quem se passa pelo LARCC.

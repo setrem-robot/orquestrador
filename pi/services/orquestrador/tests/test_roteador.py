@@ -132,5 +132,28 @@ class TestEntradasMalformadas(unittest.TestCase):
         self.assertEqual(rotear({"tipo": "autodestruicao"}), [])
 
 
+class TestComandoMoverContinuo(unittest.TestCase):
+    """`mover`: o formato que um joystick produz, com dois eixos contínuos."""
+
+    def test_repassa_os_dois_eixos(self):
+        destino, payload = rotear(
+            {"tipo": "motor", "acao": "mover", "linear": 0.8, "angular": -0.3}
+        )[0]
+        self.assertEqual(destino, topics.MOTORES_COMANDO)
+        self.assertEqual(payload, {"acao": "mover", "linear": 0.8, "angular": -0.3})
+
+    def test_satura_os_eixos_em_menos_um_e_um(self):
+        # O app é não-confiável: um eixo em 5,0 não pode virar cinco vezes a
+        # velocidade máxima do outro lado do barramento.
+        _, payload = rotear({"tipo": "motor", "acao": "mover", "linear": 5.0})[0]
+        self.assertEqual(payload["linear"], 1.0)
+
+    def test_eixo_ausente_ou_torto_vira_zero(self):
+        # Um `mover` pela metade é uma parada — a interpretação segura de um
+        # comando que chegou incompleto.
+        _, payload = rotear({"tipo": "motor", "acao": "mover", "linear": "rápido"})[0]
+        self.assertEqual(payload, {"acao": "mover", "linear": 0.0, "angular": 0.0})
+
+
 if __name__ == "__main__":
     unittest.main()

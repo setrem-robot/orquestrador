@@ -87,6 +87,15 @@ class ServerCallbacks : public BLEServerCallbacks {
   void onDisconnect(BLEServer* server) override {
     deviceConnected = false;
     lineLen = 0;
+
+    // O celular pode ter sumido no meio de um movimento — saiu de alcance,
+    // ficou sem bateria, o app foi fechado. O app manda "F" quando o dedo
+    // desce e "S" quando sobe; se a conexao morre entre os dois, o "S" nunca
+    // chega e o robo fica andando sozinho. Esta linha e a ultima coisa que
+    // esta ponte consegue fazer por quem esta na frente dele.
+    PI_SERIAL.print("{\"tipo\":\"parada_emergencia\"}");
+    PI_SERIAL.print('\n');
+
     // Sem isso o ESP32 para de anunciar apos a primeira desconexao
     // (peculiaridade conhecida da biblioteca BLE do ESP32).
     server->startAdvertising();

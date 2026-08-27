@@ -22,8 +22,19 @@ ExecStart=/home/setrem/setrem-robot/pi/.venv/bin/motores
 Environment=MQTT_HOST=127.0.0.1
 Environment=MQTT_PORT=1883
 Environment=VELOCIDADE_PADRAO=60
-Environment=MOTOR1_INVERTIDO=false
-Environment=MOTOR2_INVERTIDO=false
+# Qual lado foi parafusado ao contrário. Os nomes antigos (MOTOR1/MOTOR2)
+# continuam sendo aceitos, para uma atualização não apagar a calibração de um
+# chassi que já anda reto.
+Environment=MOTOR_ESQ_INVERTIDO=false
+Environment=MOTOR_DIR_INVERTIDO=false
+# "auto" usa os motores de verdade e cai para o modo simulado onde não houver
+# GPIO — o que permite subir este serviço num notebook e ver no log o que o robô
+# faria. Num Pi, "auto" é sempre o hardware.
+Environment=MOTORES_BACKEND=auto
+# Rampa de aceleração: do parado ao máximo em 1/3 de segundo. Um motor de passo
+# com carga que parte direto na velocidade final perde passo — o eixo não
+# acompanha o pulso e o robô anda menos do que mandaram. 0 desliga.
+Environment=ACELERACAO=3.0
 # Reinicia sempre que cair; espera 3s entre tentativas.
 Restart=always
 RestartSec=3

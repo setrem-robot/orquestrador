@@ -1,0 +1,60 @@
+# ============================================================
+# Broker MQTT do Pi quando ele vem do apt, e não do Docker.
+# ------------------------------------------------------------
+# Copie para /etc/systemd/../mosquitto/conf.d/ e reinicie o serviço:
+#
+#   sudo cp pi/mosquitto/apt/robo.conf.example /etc/mosquitto/conf.d/robo.conf
+#   sudo systemctl restart mosquitto
+#
+# POR QUE ESTE ARQUIVO EXISTE
+#
+# Há dois jeitos de o Pi ter um broker, e os dois estão em uso no projeto:
+#
+#   1. `pi/docker-compose.yml`, deste repositório, sobe o Mosquitto em container
+#      com `pi/mosquitto/config/mosquitto.conf`.
+#   2. `scripts/setup-raspberry-pi.sh --bluetooth-app`, do repositório RobotEye,
+#      instala o Mosquitto pelo apt — porque a ponte Bluetooth precisa de um
+#      broker para entregar o que recebe do celular, e ali não há Docker.
+#
+# Os dois escutam a 1883. Rodando juntos, o segundo a subir falha com
+# "Address already in use", e o sintoma é o robô aceitar comandos do app e não
+# mover nada — sem erro em lugar nenhum, porque a ponte publica com sucesso num
+# broker que ninguém mais está ouvindo.
+#
+# **Escolha um.** Num Pi que roda a face, a escuta e os motores, o do apt é o
+# mais simples: um serviço a menos, sem Docker no caminho de um comando de
+# direção. Se for esse o escolhido, o `pi/docker-compose.yml` não deve subir, e
+# a configuração que vale é ESTA — a do container fica sem efeito.
+#
+#   sudo systemctl disable --now docker-compose@mosquitto 2>/dev/null || true
+#   docker compose -f pi/docker-compose.yml down 2>/dev/null || true
+# ============================================================
+
+# --- Persistência ---
+# Guarda mensagens retidas e as filas de QoS>0 entre reinícios. Sem isto, um
+# reboot do robô apaga a telemetria que ainda não tinha subido para o LARCC.
+persistence true
+persistence_location /var/lib/mosquitto/
+
+# --- Listener local ---
+# Só o loopback: quem fala com este broker são os processos do próprio robô (a
+# ponte Bluetooth, o orquestrador, os motores). Nada de fora do Pi o alcança.
+listener 1883 127.0.0.1
+allow_anonymous true
+
+# --- Fila para quando o LARCC estiver fora de alcance ---
+# Mesmos números do broker em container, e pelo mesmo motivo: o padrão de 1000
+# mensagens dá dezessete minutos de queda antes de o histórico ganhar buracos, e
+# o robô sai de campo. Ver pi/mosquitto/config/mosquitto.conf.
+max_queued_messages 100000
+max_queued_bytes 33554432
+
+# --- Bridge para o LARCC ---
+# A bridge fica num arquivo próprio porque leva a senha do broker remoto e não
+# pode ir para o git. Copie o exemplo e ajuste o caminho:
+#
+#   sudo cp pi/mosquitto/config/conf.d/bridge.conf.example \
+#           /etc/mosquitto/conf.d/bridge.conf
+#   sudo nano /etc/mosquitto/conf.d/bridge.conf   # preencha os SUBSTITUA_*
+#   sudo chmod 600 /etc/mosquitto/conf.d/bridge.conf
+#   sudo systemctl restart mosquitto

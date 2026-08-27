@@ -13,6 +13,7 @@ Formatos de entrada aceitos (Bluetooth -> ESP32 -> serial_ingestor):
 
   Formato expandido (retrocompatível):
     {"tipo": "motor",  "acao": "frente", "velocidade": 80}
+    {"tipo": "motor",  "acao": "mover", "linear": 0.8, "angular": -0.3}
     {"tipo": "voz",    "texto": "olá, tudo bem?"}
     {"tipo": "parada_emergencia"}
 
@@ -63,17 +64,38 @@ class ComandoRoteavel(ABC):
 
 
 class ComandoMotor(ComandoRoteavel):
-    """tipo: "motor" — movimenta o robô."""
+    """tipo: "motor" — movimenta o robô.
+
+    Duas formas convivem. As quatro direções são o que o app manda hoje, com um
+    botão por direção. `"mover"` é a forma contínua: `linear` e `angular`, cada
+    um de -1 a 1, que é o que um joystick ou um controle analógico produz — e o
+    que permite curvar andando, em vez de escolher entre andar e girar.
+
+    O serviço de motores trata as duas do mesmo jeito (ver `cinematica.py`);
+    aqui elas são apenas validadas antes de sair do mundo não-confiável do app.
+    """
 
     # Ações de motor que aceitamos do app. Mantém o robô previsível: qualquer
     # outra ação é rejeitada antes de chegar ao grupo de Movimento.
-    ACOES_VALIDAS = {"frente", "tras", "esquerda", "direita", "parar"}
+    ACOES_VALIDAS = {"frente", "tras", "esquerda", "direita", "parar", "mover"}
 
     def rotear(self, cmd: dict[str, Any]) -> list[Publicacao]:
         acao = cmd.get("acao")
         if acao not in self.ACOES_VALIDAS:
             logger.warning("Comando de motor com ação inválida: %r", acao)
             return []
+
+        if acao == "mover":
+            return [
+                (
+                    topics.MOTORES_COMANDO,
+                    {
+                        "acao": "mover",
+                        "linear": self._limitar_eixo(cmd.get("linear")),
+                        "angular": self._limitar_eixo(cmd.get("angular")),
+                    },
+                )
+            ]
 
         velocidade = 0 if acao == "parar" else self._limitar_velocidade(cmd.get("velocidade"))
         return [(topics.MOTORES_COMANDO, {"acao": acao, "velocidade": velocidade})]
@@ -89,6 +111,20 @@ class ComandoMotor(ComandoRoteavel):
         except (TypeError, ValueError):
             return VELOCIDADE_PADRAO
         return max(0, min(100, v))
+
+    @staticmethod
+    def _limitar_eixo(valor: Any) -> float:
+        """Converte e satura um eixo em [-1, 1].
+
+        Ausente vira zero, e não um padrão de movimento: um `mover` sem eixo
+        nenhum é uma parada, e essa é a interpretação segura de um comando pela
+        metade.
+        """
+        try:
+            v = float(valor)
+        except (TypeError, ValueError):
+            return 0.0
+        return max(-1.0, min(1.0, v))
 
 
 class ComandoVoz(ComandoRoteavel):

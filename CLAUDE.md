@@ -15,8 +15,45 @@ essa documentação não cobre.
   (`pi/scripts/install.sh`) e rodando como serviço systemd: `serial_ingestor`,
   `orquestrador` (o roteador), `motores`, `gps`, `wifi`. Compartilham a lib
   `robo_common` (tópicos MQTT + `MqttService`).
-- **`cloud/`** — Mosquitto remoto + `ingestor` (Python) + TimescaleDB via
-  Docker Compose. Só recebe o que está sob `robo/telemetria/#`.
+- **`cloud/`** — Mosquitto remoto + `ingestor` + TimescaleDB + **`api`** +
+  **`cloudflared`**, via Docker Compose. Os três primeiros são o caminho de ida
+  (robô → banco); os dois últimos são o de volta, que faltava: um celular não
+  fala Postgres, e abrir o banco para a internet para que ele falasse seria
+  trocar um buraco por um bem maior.
+- **`site/`** — a landing page, HTML/CSS/JS puros, publicada pelo Cloudflare
+  Pages. Consome as rotas **públicas** da API (sem token, e servindo menos).
+
+## A API é só de leitura, e tem duas portas
+
+`cloud/api/` (FastAPI) nunca escreve — quem grava é o `ingestor`. Ela roda com
+um usuário do banco separado, só com `SELECT` (`robo_leitura`): a API é a única
+peça exposta à internet, e um bug numa rota não pode ser capaz de apagar meses
+de telemetria.
+
+- `/v1/...` exige `Authorization: Bearer`, e serve tudo.
+- `/v1/publico/...` não exige nada e serve menos — o resumo, e o trajeto com a
+  posição arredondada para ~11 m. A landing page é estática: qualquer token no
+  JavaScript dela seria legível por quem abrisse o inspetor, então em vez de
+  fingir que é segredo, aquela porta serve menos.
+
+`cloud/api/app/consultas.py` devolve `(sql, parametros)` e **não toca no
+banco** — mesmo desenho de `roteador.py` e `motores/cinematica.py`, pelo mesmo
+motivo: o que erra por descuido (limite não saturado, campo entrando no SQL sem
+validação) fica testável sem infraestrutura. 27 testes:
+
+```bash
+cd cloud/api && python3 -m unittest discover -s tests
+```
+
+**O `intervalo` e o `campo` são interpolados no SQL** — `time_bucket` e o
+operador `->>` não aceitam parâmetro para eles. Por isso o primeiro vem de uma
+lista fechada (`INTERVALOS`) e o segundo passa por `campo_valido()`. Ao mexer
+ali, essa validação é a única coisa entre o cliente e uma injeção.
+
+**Sem dados para testar?** `cloud/scripts/semear-demonstracao.py` enche o banco
+com um trajeto plausível em volta do campus, bateria descarregando e comandos
+de motor coerentes com a curva. Tudo marcado com `"demo": true`, que é o que
+faz `--limpar` nunca tocar em telemetria de verdade.
 
 ## BLE, não Bluetooth Classic
 
@@ -27,6 +64,22 @@ BLE (padrão Nordic UART Service, no topo do `.ino`) **precisam bater** com
 `RobotBleIds` em `../app/lib/services/robot_connection.dart`. A validação de
 JSON e o formato de mensagem (`{"cmd":"F"}\n`) continuam idênticos — só o
 transporte mudou.
+
+## Segurança: movimento é repetido, silêncio é "pare"
+
+Um comando de movimento não vale para sempre. O app repete o mesmo comando a
+cada 300 ms enquanto o dedo está no botão; `motores/vigia.py` para os motores se
+ficar 1 s sem receber nada. Antes disso, uma conexão que morresse com o dedo no
+botão deixava o robô andando sozinho — o `S` do "dedo levantou" nunca chegava.
+
+São três camadas independentes (app repete, ESP32 avisa ao perder o BLE, motores
+vigiam o silêncio); o quadro completo está em `docs/contrato-mqtt.md`. Ao mexer
+em qualquer ponto desse caminho, pergunte **o que acontece se isto morrer no meio
+de um movimento** — e prefira a resposta que para o robô.
+
+`vigia.py` é lógica pura, sem GPIO e sem relógio próprio (quem chama informa o
+instante): 12 testes em `pi/services/motores/tests/`, sem hardware e sem esperar
+em tempo real.
 
 ## `roteador.py` é Command Pattern, não dict de funções
 
@@ -49,24 +102,53 @@ pip install -e pi/services/_common -e pi/services/orquestrador
 cd pi/services/orquestrador && python -m unittest discover -s tests -v
 ```
 
-**Por que só `roteador.py` foi refatorado:** é a única peça do projeto que é
-lógica pura, sem GPIO/serial/`nmcli` reais por trás. Os outros candidatos
-óbvios a POO — unificar o `_parar`/`_tratar_sinal` duplicado nos 5
-`main.py`, ou dar classes a `wifi/rede.py` — tocariam serviços que mexem com
-hardware físico (steppers, GPS, Wi-Fi do sistema); não foram feitos por não
-haver como testar sem um Raspberry Pi real disponível. Ficam documentados
-aqui como próximo passo, não como pendência esquecida.
+**O que ainda não foi refatorado:** unificar o `_parar`/`_tratar_sinal`
+duplicado nos 5 `main.py`, e dar classes a `wifi/rede.py`. Tocam serviços que
+mexem com hardware (GPS, Wi-Fi do sistema) e não há como testá-los sem um
+Raspberry Pi real. Ficam documentados aqui como próximo passo, não como
+pendência esquecida — e o caminho já está aberto: foi exatamente assim que os
+motores deixaram de precisar do robô montado (ver abaixo).
 
 ## Já orientado a objetos, sem precisar de refactor
 
-`robo_common/mqtt_client.py::MqttService`, `motores/stepper.py::Stepper` e
-`::ControladorMotores`, `gps/main.py::Posicao`, `cloud/ingestor/main.py::Ingestor`
-já são classes com boa encapsulação (estado privado, API pública enxuta).
-Não têm herança/polimorfismo — só `wifi/rede.py::ErroRede(Exception)` usa
-herança hoje, fora do que foi adicionado em `roteador.py`.
+`robo_common/mqtt_client.py::MqttService`, `gps/main.py::Posicao` e
+`cloud/ingestor/main.py::Ingestor` já são classes com boa encapsulação (estado
+privado, API pública enxuta). Não têm herança/polimorfismo — fora
+`wifi/rede.py::ErroRede(Exception)` e o que foi adicionado em `roteador.py` e
+em `motores/acionamento.py`.
+
+## `motores/` são três camadas, e as duas de baixo rodam sem robô
+
+`pi/services/motores/` foi separado em cinemática, acionamento e serviço:
+
+- **`cinematica.py`** — puro. Comando (as quatro direções, ou `mover` com
+  `linear`/`angular`) vira velocidade de cada lado, entre -1 e 1; e a `Rampa`
+  acelera até ela sem tranco. Sem GPIO e sem relógio próprio: quem chama informa
+  o `dt`, então uma rampa de meio segundo é testada em zero segundos.
+- **`acionamento.py`** — `Acionamento` é uma ABC (`abc.ABC` +
+  `@abstractmethod`). `AcionamentoStepper` fala com os TMC2209;
+  `AcionamentoSimulado` não move nada e anota o que teria feito. É o que
+  permite subir o serviço num notebook (`MOTORES_BACKEND=simulado`) e ver no
+  log o que o robô faria.
+- **`main.py`** — MQTT, vigia e o laço. Não sabe o que é um GPIO.
+
+**O pulso do motor deixou de ser feito em Python.** A versão anterior escrevia
+cada flanco do STEP à mão, com `time.sleep(delay)` numa thread — e um sleep de
+meio milissegundo não dorme meio milissegundo, dorme o que o escalonador
+resolver; a variação ia para o motor como tremor, e mil passos por segundo
+custavam duas mil voltas de laço por segundo. Hoje o pino STEP recebe uma onda
+quadrada do PWM (gpiozero → lgpio), a frequência **é** a quantidade de passos
+por segundo, e mudar a velocidade é escrever um número.
+
+Rodar os 45 testes (sem Pi, sem motor, sem broker):
+
+```bash
+cd pi/services/motores && PYTHONPATH="src:../_common/src" python -m unittest discover -s tests
+```
 
 ## Ambiente desta máquina
 
 Sem hardware real aqui (sem ESP32 conectado, sem Raspberry Pi, sem steppers).
-`roteador.py` é testável porque é lógica pura; o resto dos serviços só é
-validável de verdade no Pi físico ou com mocks que ninguém escreveu ainda.
+`roteador.py` e as duas camadas de baixo de `motores/` são testáveis porque não
+tocam hardware; `gps`, `wifi` e o `serial_ingestor` só são validáveis de verdade
+no Pi físico ou com mocks que ninguém escreveu ainda.

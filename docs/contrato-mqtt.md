@@ -66,16 +66,50 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
 
 ```json
 {"tipo": "motor", "acao": "frente", "velocidade": 80}
+{"tipo": "motor", "acao": "mover", "linear": 0.8, "angular": -0.3}
 {"tipo": "voz", "texto": "olá, tudo bem?"}
 {"tipo": "parada_emergencia"}
 {"tipo": "wifi", "acao": "conectar", "ssid": "MinhaRede", "senha": "segredo"}
 ```
 
-- `motor.acao` ∈ `{frente, tras, esquerda, direita, parar}`;
+- `motor.acao` ∈ `{frente, tras, esquerda, direita, parar, mover}`;
   `velocidade` ∈ `[0, 100]` (ausente → 60; em `parar` → 0).
+- `motor.acao = "mover"` é a forma **contínua**: `linear` e `angular`, cada um
+  em `[-1, 1]` (`linear` positivo vai à frente, `angular` positivo gira à
+  direita). É o que um joystick produz, e o que permite curvar andando em vez
+  de escolher entre andar e girar. Eixo ausente ou malformado vira `0.0`, o que
+  faz um `mover` pela metade valer como parada. As quatro direções continuam
+  existindo e são atalhos para o mesmo cálculo — ver
+  `pi/services/motores/src/motores/cinematica.py`.
 - `wifi.acao` ∈ `{conectar, listar, status}` (default `conectar`).
 - Comandos desconhecidos ou malformados são descartados (logados, não derrubam
   o serviço).
+
+### Movimento é repetido, e silêncio quer dizer "pare"
+
+Um comando de movimento **não vale para sempre**. Enquanto o dedo está no botão,
+o app repete o mesmo comando a cada **300 ms**; se o serviço de motores ficar
+**1 s** sem receber nada, ele para os motores por conta própria e publica em
+`robo/motores/status` com `"motivo": "sem_comando"`.
+
+Isso existe porque o comando de parar viaja pelo mesmo caminho que pode quebrar.
+O app manda `F` quando o dedo desce e `S` quando sobe; se a conexão morrer entre
+os dois — celular fora de alcance, sem bateria, app fechado, ESP32 travado, cabo
+serial solto —, o `S` nunca chega e o robô fica andando sozinho. Repetindo o
+comando, a ausência dele passa a ser um sinal em si.
+
+São três camadas independentes, e cada uma cobre o que a anterior não alcança:
+
+| Camada | Cobre | Onde |
+|---|---|---|
+| App repete o comando | qualquer falha no caminho, inclusive as de baixo | `robot_connection.dart::send` |
+| ESP32 manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `esp32_ble_bridge.ino::onDisconnect` |
+| Motores param sem comando por 1 s | ESP32 travado, serial solta, Pi sem receber | `motores/vigia.py` |
+
+`COMANDO_TIMEOUT_S=0` desliga a terceira camada. **Só faça isso com um app que
+não repete o comando** — do contrário o robô para no meio de todo movimento. Um
+app antigo com um Pi atualizado tem exatamente esse sintoma, e o log do serviço
+`motores` diz isso com todas as letras.
 
 > **Tudo entra por um único caminho.** O app só tem um canal Bluetooth: o
 > ESP32. Não há Bluetooth no Pi. Logo, até a credencial de Wi-Fi viaja como um
@@ -87,6 +121,7 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
 Comando normalizado para o grupo de Movimento.
 ```json
 {"acao": "frente", "velocidade": 80}
+{"acao": "mover", "linear": 0.8, "angular": -0.3}
 ```
 
 ### `robo/voz/falar`
@@ -106,7 +141,7 @@ Comando de Wi-Fi repassado ao serviço `wifi`, que valida e aplica via `nmcli`.
 | Tópico                     | Produtor          | Retained | Exemplo de payload |
 |----------------------------|-------------------|----------|--------------------|
 | `robo/gps/posicao`         | serviço `gps`     | sim      | `{"lat":-28.2,"lon":-54.0,"fix":true,"satelites":7,"velocidade_kmh":1.2,"ts":...}` |
-| `robo/motores/status`      | grupo Movimento   | sim      | `{"acao":"frente","velocidade":80}` |
+| `robo/motores/status`      | grupo Movimento   | sim      | `{"acao":"frente","velocidade":80,"esquerda":0.8,"direita":0.8}` |
 | `robo/sistema/bateria`     | (a definir)       | sim      | `{"percentual":83,"tensao_v":12.4}` |
 | `robo/sistema/wifi`        | serviço `wifi`    | sim      | `{"conectado":true,"ssid":"MinhaRede","ip":"192.168.0.42","ts":...}` |
 | `robo/sistema/heartbeat/<servico>` | cada serviço | sim | `{"servico":"gps","status":"online","ts":...}` |

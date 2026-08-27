@@ -1,0 +1,61 @@
+# ============================================================
+# Ambiente de testes na máquina de quem desenvolve.
+# ------------------------------------------------------------
+# Usado SEMPRE junto do docker-compose.yml, nunca sozinho:
+#
+#   docker compose -f docker-compose.yml -f compose.local.yml up -d
+#
+# ou, mais simples, `./scripts/ambiente-local.sh`, que já faz isso.
+#
+# POR QUE UM SEGUNDO ARQUIVO, E NÃO UM COMPOSE PRÓPRIO
+#
+# Um compose separado para desenvolvimento vira, em poucas semanas, uma
+# descrição diferente do sistema — e o que se testa aqui deixa de ser o que
+# roda lá. Aqui a definição dos serviços é UMA: a de `docker-compose.yml`, a
+# mesma que vai para a VM. Este arquivo só ajusta o que precisa ser diferente
+# numa máquina de mesa, e a lista é curta de propósito:
+#
+#   1. o broker aceita conexão sem senha, para o robô falso publicar;
+#   2. a API fala com qualquer origem (CORS) e loga em DEBUG;
+#   3. sem `cloudflared` — não há domínio apontando para cá.
+#
+# A quarta diferença — a API escutando na rede local, para o celular alcançar —
+# não está aqui: ela é `API_BIND=0.0.0.0` no `.env`. Listas de `ports` são
+# CONCATENADAS quando dois arquivos de compose são combinados, então redeclarar
+# a porta faria o Docker tentar abri-la duas vezes.
+#
+# Migrar para o LARCC é parar de passar este arquivo. Nada mais muda.
+#
+# NOTA SOBRE O WSL2: os containers sobem dentro do WSL, e o IP do WSL não é o
+# IP da sua máquina na rede. Para o celular alcançar, veja
+# `docs/ambiente-local.md` — a resposta curta é ligar o modo de rede espelhada
+# do WSL2, e são três linhas num arquivo.
+
+services:
+  mosquitto:
+    volumes:
+      # Substitui a configuração autenticada da nuvem por uma sem senha. É a
+      # única diferença de segurança do ambiente local, e ela existe para o
+      # teste não exigir gerar arquivo de senha antes de publicar a primeira
+      # mensagem. NÃO use esta configuração na VM: lá o broker está exposto.
+      - ./mosquitto/config/mosquitto.local.conf:/mosquitto/config/mosquitto.conf:ro
+
+  ingestor:
+    environment:
+      # O broker local não pede senha; estas variáveis existem porque o
+      # `main.py` as exige, e um valor vazio faria ele pular a autenticação.
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
+
+  api:
+    # A porta NÃO é redeclarada aqui: listas de `ports` são concatenadas entre
+    # arquivos de compose, e repetir a 8000 faria o Docker tentar abri-la duas
+    # vezes ("address already in use"). Quem muda o endereço de escuta é
+    # `API_BIND=0.0.0.0` no `.env` — ver `.env.local.example`.
+    environment:
+      # `*` porque em desenvolvimento a landing page é servida de onde der na
+      # hora — `python -m http.server`, `file://`, outra porta. Na VM isto é o
+      # domínio real, e uma origem só.
+      CORS_ORIGENS: "*"
+      # Log falante: aqui você quer ver cada consulta enquanto ajusta a tela.
+      LOG_LEVEL: DEBUG
