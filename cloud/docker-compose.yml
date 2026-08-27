@@ -4,6 +4,13 @@
 #   mosquitto    -> broker MQTT remoto (recebe a telemetria da bridge do Pi)
 #   timescaledb  -> banco de séries temporais (histórico de telemetria)
 #   ingestor     -> assina robo/telemetria/# e grava no TimescaleDB
+#   api          -> lê o histórico e serve ao app e à landing page (só leitura)
+#   cloudflared  -> publica a API no domínio, sem IP público (perfil `tunel`)
+#
+# Os três primeiros são o caminho de ida — do robô para o banco. Os dois
+# últimos são o de volta, que faltava: sem eles a telemetria entrava e não
+# saía, porque um celular não fala Postgres e abrir o banco para a internet
+# para que ele falasse seria trocar um buraco por um bem maior.
 #
 # Variáveis sensíveis (senhas) vêm de um arquivo .env ao lado deste compose.
 # Copie .env.example para .env e preencha. Veja docs/setup-cloud.md.
@@ -29,6 +36,10 @@ services:
       POSTGRES_USER: ${PGUSER:-robo}
       POSTGRES_PASSWORD: ${PGPASSWORD:?defina PGPASSWORD no .env}
       POSTGRES_DB: ${PGDATABASE:-robo}
+      # Lidas por timescaledb/init/02_usuario_leitura.sh na primeira subida,
+      # para criar o usuário só-leitura que a API usa.
+      API_PGUSER: ${API_PGUSER:-robo_leitura}
+      API_PGPASSWORD: ${API_PGPASSWORD:-}
     ports:
       # Exposto só no loopback da VM: o banco não fica aberto à internet.
       # Acesse remotamente via túnel SSH se precisar inspecionar.
@@ -63,6 +74,61 @@ services:
       PGUSER: ${PGUSER:-robo}
       PGPASSWORD: ${PGPASSWORD:?defina PGPASSWORD no .env}
       PGDATABASE: ${PGDATABASE:-robo}
+
+  # A peça que faltava para o app conseguir LER o que o robô gravou. Só leitura:
+  # quem escreve continua sendo o ingestor, acima.
+  api:
+    build: ./api
+    container_name: api-cloud
+    restart: unless-stopped
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      # Só no loopback da VM. Quem publica isto na internet é o túnel da
+      # Cloudflare, abaixo — assim não é preciso abrir porta nenhuma no
+      # firewall do LARCC, e o certificado HTTPS vem de graça e renovado.
+      # Para testar direto na VM: curl http://127.0.0.1:8000/saude
+      - "127.0.0.1:8000:8000"
+    environment:
+      PGHOST: timescaledb
+      PGPORT: 5432
+      # Usuário separado, só de leitura. Ver docs/setup-cloud.md: um bug numa
+      # rota não pode ser capaz de apagar histórico.
+      PGUSER: ${API_PGUSER:-robo_leitura}
+      PGPASSWORD: ${API_PGPASSWORD:?defina API_PGPASSWORD no .env}
+      PGDATABASE: ${PGDATABASE:-robo}
+      API_TOKEN: ${API_TOKEN:?defina API_TOKEN no .env}
+      CORS_ORIGENS: ${CORS_ORIGENS:-}
+      PUBLICO_HABILITADO: ${PUBLICO_HABILITADO:-true}
+      PRECISAO_GPS_PUBLICA: ${PRECISAO_GPS_PUBLICA:-4}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/saude').status==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Publica a API no seu domínio da Cloudflare sem IP público e sem porta
+  # aberta: o túnel abre a conexão DE DENTRO para fora, e a Cloudflare passa a
+  # entregar as requisições por ela. Numa VM institucional isso é o que evita
+  # pedir liberação de firewall — e o HTTPS válido vem junto.
+  #
+  # Desligado por padrão (perfil `tunel`), porque exige o token criado no painel:
+  #   docker compose --profile tunel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-cloud
+    restart: unless-stopped
+    profiles: ["tunel"]
+    depends_on:
+      api:
+        condition: service_started
+    # `--no-autoupdate`: um túnel que se atualiza sozinho no meio de uma
+    # apresentação é um túnel que cai no meio de uma apresentação.
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina TUNNEL_TOKEN no .env}
 
 volumes:
   mosquitto_remote_data:
