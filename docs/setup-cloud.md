@@ -100,3 +100,51 @@ ORDER BY ts;
 | `PGUSER`        | `robo`        | db/ingestor |
 | `PGPASSWORD`    | (obrigatório) | db/ingestor |
 | `PGDATABASE`    | `robo`        | db/ingestor |
+
+## O robô sai de campo, e a rede cai
+
+A telemetria não pode depender de o Wi-Fi estar de pé no instante em que o dado
+acontece. O caminho inteiro foi montado para sobreviver a uma queda:
+
+1. Os serviços publicam no broker **local**, no próprio Pi. Isso nunca falha por
+   causa da internet.
+2. A bridge replica `robo/telemetria/#` com **QoS 1** e `cleansession false`.
+   Enquanto o LARCC estiver fora de alcance, o broker local **guarda** o que não
+   subiu, em vez de descartar.
+3. Quando a VM volta, tudo sobe de uma vez. O `ingestor` grava usando o campo
+   `ts` do payload — e não o instante em que a mensagem chegou —, então o que
+   subiu com três horas de atraso entra no banco **na hora certa**. Não há nada
+   a reenviar à mão, e o gráfico não ganha um degrau falso.
+
+O tamanho dessa fila é a única coisa que precisa de decisão, e o padrão do
+Mosquitto não serve: 1000 mensagens são cerca de **dezessete minutos** de queda
+no ritmo atual (~2 msg/s somando GPS, motores, bateria e Wi-Fi). Passando disso,
+o Mosquitto descarta as mais antigas em silêncio — e o buraco só aparece
+semanas depois, na consulta. Por isso `pi/mosquitto/config/mosquitto.conf` sobe
+o limite para 100 mil mensagens (~14 horas) com teto de 32 MiB, que é o que
+protege o cartão SD.
+
+Para ver de que lado está o problema, no Pi:
+
+```bash
+./pi/scripts/verificar-telemetria.sh
+```
+
+Ele diz se a bridge está ligada, quantas mensagens estão esperando na fila e
+qual foi o último valor de cada tipo.
+
+### Um broker, não dois
+
+O Pi pode acabar com **dois** Mosquitto instalados, e os dois querem a porta
+1883: o do `pi/docker-compose.yml`, deste repositório, e o que
+`scripts/setup-raspberry-pi.sh --bluetooth-app` (repositório RobotEye) instala
+pelo apt para a ponte Bluetooth entregar os comandos do celular.
+
+O segundo a subir falha com *"Address already in use"*, e o sintoma não parece
+um problema de broker: o app conecta, os comandos chegam ao Pi e o robô não se
+mexe — porque a ponte publica com sucesso num broker que ninguém mais escuta.
+
+Escolha um. Num Pi que roda a face, a escuta e os motores, o do apt é o mais
+simples; nesse caso a configuração que vale é
+`pi/mosquitto/apt/robo.conf.example` (fila, persistência e listener), e o
+`docker-compose.yml` do Pi não deve subir.
