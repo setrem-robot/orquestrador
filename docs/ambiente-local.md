@@ -95,77 +95,74 @@ Agora o endereço mostrado é o IP da sua máquina na rede.
 > Exige Windows 11 22H2 ou mais novo.
 
 **Falta ainda o firewall** — a rede espelhada sozinha não deixa o celular
-entrar. Veja *O firewall*, mais abaixo: é um script, e sem ele o endereço
-continua respondendo só de dentro do WSL.
+entrar. É um comando, e roda daqui mesmo:
+
+```bash
+./cloud/scripts/ambiente-local.sh --rede
+```
+
+Veja *O firewall*, logo abaixo, para o porquê.
 
 ### Se a rede espelhada não for possível
 
-A alternativa é encaminhar a porta do Windows para o WSL. No PowerShell **como
-administrador**:
+Não faça nada de diferente: rode o mesmo `--rede` da seção seguinte. Ele
+detecta que o WSL está no modo NAT e, em vez da regra de firewall, cria um
+**encaminhamento de porta** — o Windows escuta na 8000 e repassa para o IP
+interno do WSL.
 
-```powershell
-$wsl = (wsl hostname -I).Trim().Split()[0]
-netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 `
-  connectport=8000 connectaddress=$wsl
-New-NetFirewallRule -DisplayName "Atlas API" -Direction Inbound `
-  -LocalPort 8000 -Protocol TCP -Action Allow
-```
+Funciona bem, com um porém que morde: **o IP do WSL muda a cada reinício**, e o
+encaminhamento passa a apontar para o vazio. Quando o celular parar de alcançar
+depois de reiniciar a máquina, rode o `--rede` de novo — ele reaponta. É por
+isso que a rede espelhada continua sendo a recomendação: lá não há para onde
+reapontar.
 
-Funciona, mas tem um porém que morde: **o IP do WSL muda a cada reinício**, e o
-encaminhamento passa a apontar para o lugar errado. Você teria que refazer isso
-de tempos em tempos. Por isso a rede espelhada é a recomendação.
-
-Para desfazer: `netsh interface portproxy delete v4tov4 listenport=8000 listenaddress=0.0.0.0`.
-
-### O firewall — e este é o passo que quase todo mundo erra
+### O firewall — o passo que quase todo mundo erra
 
 Ligar a rede espelhada **não basta**. Com ela, o WSL passa a ser filtrado pelo
-**firewall do Hyper-V**, que é um conjunto de regras separado do firewall comum
-do Windows. A política padrão de entrada dele é `Block`:
+**firewall do Hyper-V**, um conjunto de regras separado do firewall comum do
+Windows, cuja política de entrada padrão é `Block`.
 
-```powershell
-Get-NetFirewallHyperVVMSetting -PolicyStore ActiveStore |
-  Select-Object -ExpandProperty DefaultInboundAction
-# Block
+O sintoma não parece firewall: a API responde dentro do WSL, responde no
+`127.0.0.1` do Windows, o container está `healthy` — e o celular não alcança.
+
+**Resolve daqui mesmo, do Linux:**
+
+```bash
+./cloud/scripts/ambiente-local.sh --rede
 ```
 
-O sintoma é cruel porque não parece firewall. A API responde perfeitamente
-dentro do WSL, responde no `localhost` do Windows, o container está `healthy` —
-e **não responde para mais ninguém**: nem para o próprio Windows pelo IP da
-rede, nem para o celular.
+Vai abrir o *"Deseja permitir que este aplicativo faça alterações?"* do Windows
+— clique em **Sim**. É a única parte que não dá para fazer do Linux: mexer em
+firewall exige privilégio de administrador do Windows, e nem o `sudo` o
+concede.
 
-A armadilha é que `New-NetFirewallRule` — o cmdlet que aparece em quase toda
-resposta de internet sobre isso — **não resolve**. Ele cria a regra no firewall
-do Windows, e quem está bloqueando é o do Hyper-V. O cmdlet certo é
-`New-NetFirewallHyperVRule`, com o `VMCreatorId` do WSL.
+O script descobre em qual modo de rede você está e faz o certo para cada um:
 
-Há um script pronto. No PowerShell **como administrador**, na pasta do
-repositório:
+| Modo | O que ele faz |
+|---|---|
+| espelhado | regra no firewall do Hyper-V (`New-NetFirewallHyperVRule`) |
+| NAT | encaminhamento de porta (`netsh portproxy`) + regra no firewall comum |
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\cloud\scripts\liberar-portas-wsl.ps1
+Escolher errado aí é passar meia hora procurando problema na API. E é fácil
+errar: `New-NetFirewallRule` — o cmdlet que aparece em quase toda resposta de
+internet sobre isso — **não funciona no modo espelhado**, porque cria a regra
+no firewall do Windows e quem bloqueia é o do Hyper-V.
+
+Outros usos:
+
+```bash
+./cloud/scripts/ambiente-local.sh --rede --conferir   # só diz como está
+./cloud/scripts/liberar-rede.sh --remover             # desfaz
 ```
-
-Ele libera a 8000 (a API, para o app) e a 1883 (o broker, para apontar o Pi
-para cá). Rodar duas vezes não duplica nada. Para desfazer, o mesmo script com
-`-Remover`.
 
 > **Não tente confirmar pelo Windows.** No modo espelhado, o próprio Windows
 > não alcança o WSL pelo IP da rede — nem pelo da LAN, nem por um do Tailscale;
 > só por `127.0.0.1`. Isso é do espelhamento, não do firewall, e foi medido
-> nesta máquina com as regras já criadas e funcionando. Um `Invoke-WebRequest`
-> dali dá timeout e faz parecer que nada mudou.
+> nesta máquina com as regras já criadas e ativas. Um `Invoke-WebRequest` dali
+> dá timeout e faz parecer que nada mudou.
 >
 > **Quem responde de verdade é o celular.** Abra o app, ponha o endereço e o
 > token, e toque em *Salvar e testar* — é o único teste que vale.
-
-Se preferir fazer à mão:
-
-```powershell
-New-NetFirewallHyperVRule -Name "Atlas-API" -DisplayName "Atlas API (WSL)" `
-  -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' `
-  -Direction Inbound -Protocol TCP -LocalPorts 8000 -Action Allow
-```
 
 ### Testar a landing page junto
 

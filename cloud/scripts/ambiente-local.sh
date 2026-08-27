@@ -8,6 +8,7 @@
 #   ./cloud/scripts/ambiente-local.sh --zerar      para e APAGA o banco
 #   ./cloud/scripts/ambiente-local.sh --logs       acompanha os logs
 #   ./cloud/scripts/ambiente-local.sh --endereco   só mostra o que pôr no app
+#   ./cloud/scripts/ambiente-local.sh --rede       libera a porta para o celular
 #
 # É o MESMO `docker-compose.yml` que vai rodar na VM do LARCC — este script só
 # acrescenta `compose.local.yml` por cima, que ajusta três coisas (portas na
@@ -107,14 +108,14 @@ conferir_firewall_wsl() {
     fi
 
     echo
-    falha "não há regra liberando a porta no firewall do Hyper-V."
-    info "com a rede espelhada, é ele quem filtra o WSL — e a política padrão"
-    info "de entrada é Block. No PowerShell COMO ADMINISTRADOR, nesta pasta:"
+    falha "não há regra liberando a porta: o celular não vai alcançar."
+    info "com a rede espelhada, quem filtra o WSL é o firewall do Hyper-V, e a"
+    info "política de entrada padrão dele é Block. Resolve daqui mesmo, com:"
     info ""
-    info "    powershell -ExecutionPolicy Bypass -File .\\cloud\\scripts\\liberar-portas-wsl.ps1"
+    info "    ./cloud/scripts/ambiente-local.sh --rede"
     info ""
-    info "O New-NetFirewallRule comum não resolve: ele cria a regra no firewall"
-    info "do Windows, e quem bloqueia é o do Hyper-V. Ver docs/ambiente-local.md."
+    info "(vai abrir o pedido de permissão do Windows — é a única parte que não"
+    info "dá para fazer do Linux. Ver docs/ambiente-local.md.)"
 }
 
 mostrar_endereco() {
@@ -177,6 +178,13 @@ case "${1:-}" in
     --endereco)
         mostrar_endereco
         exit 0
+        ;;
+    --rede)
+        # Liberar a porta para o celular exige privilégio do Windows, que o
+        # sudo do Linux não concede. O script abaixo pede a elevação (o UAC) e
+        # escolhe entre regra de firewall e encaminhamento conforme o modo de
+        # rede do WSL — errar essa escolha é meia hora procurando problema na API.
+        exec "${CLOUD_DIR}/scripts/liberar-rede.sh" "${2:-}"
         ;;
     --robo|"")
         ;;
@@ -283,6 +291,7 @@ cat <<EOF
 ${BOLD}Comandos que você vai querer:${RESET}
 
     $0 --logs        o que cada peça está fazendo
+    $0 --rede        libera a porta para o celular alcançar
     $0 --parar       desliga (os dados ficam)
     $0 --zerar       desliga e apaga o banco
 
