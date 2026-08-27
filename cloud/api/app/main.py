@@ -68,6 +68,37 @@ app = FastAPI(
     lifespan=ciclo_de_vida,
 )
 
+
+#: Cabeçalhos de segurança em toda resposta. São baratos e cobrem o caso em que
+#: alguém aponta um navegador — ou uma página de terceiros — para esta API, que
+#: hoje serve só JSON mas responde a qualquer origem que a alcance pelo túnel.
+#:
+#: - **nosniff**: o navegador não tenta adivinhar que o JSON é HTML e executá-lo.
+#: - **frame-ancestors / X-Frame-Options**: a resposta não pode ser embutida num
+#:   iframe de outro site (clickjacking não se aplica a JSON, mas custa uma linha).
+#: - **CSP `default-src 'none'`**: uma resposta desta API não carrega script,
+#:   imagem nem estilo de lugar nenhum — não há o que carregar, e dizer isso
+#:   fecha a porta a um XSS refletido caso uma rota um dia devolva HTML por engano.
+#: - **HSTS**: o navegador passa a exigir HTTPS neste host pelos próximos dois
+#:   anos. Só afeta quem chega pelo domínio da Cloudflare (o único caminho até
+#:   aqui), e nunca `includeSubDomains`, para não impor a regra ao resto do
+#:   domínio pessoal de quem hospeda.
+_CABECALHOS_SEGURANCA = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Strict-Transport-Security": "max-age=63072000",
+}
+
+
+@app.middleware("http")
+async def cabecalhos_de_seguranca(request: Request, call_next):
+    resposta = await call_next(request)
+    for chave, valor in _CABECALHOS_SEGURANCA.items():
+        resposta.headers.setdefault(chave, valor)
+    return resposta
+
 _origens = [o.strip() for o in os.environ.get("CORS_ORIGENS", "").split(",") if o.strip()]
 if _origens:
     app.add_middleware(
