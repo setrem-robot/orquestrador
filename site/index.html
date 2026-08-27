@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atlas — o robô da Setrem</title>
+  <meta name="description" content="Atlas é um robô autônomo construído pelo curso de Engenharia de Computação da Setrem: anda pelo campus, conversa por voz e conta o que está fazendo.">
+
+  <meta property="og:title" content="Atlas — o robô da Setrem">
+  <meta property="og:description" content="Anda pelo campus, conversa por voz e conta o que está fazendo.">
+  <meta property="og:type" content="website">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- Leaflet: o mesmo mapa que o app usa (OpenStreetMap), sem chave de API. -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="faixa">
+    <span class="marca">ATLAS</span>
+    <nav>
+      <a href="#ao-vivo">Ao vivo</a>
+      <a href="#partes">Como funciona</a>
+      <a href="https://github.com/setrem-robot" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="heroi">
+    <p class="sobrelinha">Engenharia de Computação · Setrem</p>
+    <h1>Um robô que anda pelo campus <em>e conversa</em>.</h1>
+    <p class="chamada">
+      A Atlas é construída por dentro: a face animada, a voz, a inteligência que
+      responde, o controle dos motores e a telemetria que chega até aqui. Nada
+      de caixa-preta comprada pronta — cada parte é código que dá para abrir.
+    </p>
+    <div class="acoes">
+      <a class="botao primario" href="#ao-vivo">Ver o robô agora</a>
+      <a class="botao" href="https://github.com/setrem-robot" rel="noopener">Ler o código</a>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <section id="ao-vivo" class="ao-vivo">
+    <div class="cabecalho-secao">
+      <h2>Ao vivo</h2>
+      <p id="estado-conexao" class="estado carregando">consultando o robô…</p>
+    </div>
+
+    <!--
+      O mapa e os números só aparecem quando há resposta. Uma página de
+      apresentação que mostra caixas vazias com "—" passa a impressão de estar
+      quebrada; melhor dizer que o robô está desligado, que é a verdade e é
+      informação.
+    -->
+    <div id="painel" class="painel" hidden>
+      <div id="mapa" class="mapa" role="img" aria-label="Mapa com o trajeto recente do robô"></div>
+      <ul id="numeros" class="numeros"></ul>
+    </div>
+
+    <p id="sem-dados" class="aviso" hidden></p>
+
+    <p class="rodape-secao">
+      A posição mostrada aqui é arredondada para cerca de 11 metros — dá para
+      ver o robô andando pelo campus, e não para saber em que sala ele está.
+    </p>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <section id="partes" class="partes">
+    <h2>Três partes, um robô</h2>
+    <p class="subtitulo">
+      Cada uma é um repositório próprio, com sua linguagem e seu ritmo. Elas se
+      encontram em dois lugares: o Bluetooth do celular e o barramento de
+      mensagens que roda dentro do robô.
+    </p>
+
+    <div class="cartoes">
+      <article class="cartao">
+        <div class="icone" aria-hidden="true">📱</div>
+        <h3>O aplicativo</h3>
+        <p>
+          Flutter, Android e iOS. Dirige o robô por Bluetooth de baixa energia e
+          mostra o histórico que você está vendo nesta página — trajeto no mapa,
+          bateria ao longo do dia, e cada mensagem como ela chegou.
+        </p>
+        <a href="https://github.com/setrem-robot/aplicativo" rel="noopener">aplicativo →</a>
+      </article>
+
+      <article class="cartao">
+        <div class="icone" aria-hidden="true">🧠</div>
+        <h3>O orquestrador</h3>
+        <p>
+          O corpo. Serviços em Python no Raspberry Pi que movem os motores de
+          passo, leem o GPS, provisionam o Wi-Fi e mandam a telemetria para a
+          nuvem — sem perder nada quando a rede cai no meio do caminho.
+        </p>
+        <a href="https://github.com/setrem-robot/orquestrador" rel="noopener">orquestrador →</a>
+      </article>
+
+      <article class="cartao">
+        <div class="icone" aria-hidden="true">👀</div>
+        <h3>A face e a voz</h3>
+        <p>
+          Dois olhos animados que respiram, piscam e acompanham a fala. Ouve pelo
+          microfone, responde por uma IA que roda na rede — e cai para uma menor,
+          dentro do próprio robô, quando o Wi-Fi some.
+        </p>
+        <a href="https://github.com/setrem-robot/atlas_ai_v2" rel="noopener">atlas_ai_v2 →</a>
+      </article>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <section class="caminho">
+    <h2>Como um dado chega até aqui</h2>
+    <ol class="passos">
+      <li><strong>O robô publica.</strong> Cada serviço manda o que sabe para um barramento de mensagens que roda dentro do próprio Raspberry Pi.</li>
+      <li><strong>A ponte replica.</strong> Só o que é histórico sobe para a nuvem. Se a rede estiver fora, fica guardado no robô — até catorze horas — e sobe depois, com a hora certa.</li>
+      <li><strong>O banco guarda.</strong> Um TimescaleDB numa VM do LARCC, que é feito para responder rápido a perguntas sobre períodos de tempo.</li>
+      <li><strong>Esta página lê.</strong> Pela mesma API que o aplicativo usa — só que por uma porta que serve menos, sem token e com a posição arredondada.</li>
+    </ol>
+  </section>
+</main>
+
+<footer>
+  <p>
+    <strong>Atlas</strong> · Projeto Interdisciplinar de Extensão ·
+    Engenharia de Computação, Sociedade Educacional Três de Maio
+  </p>
+  <p class="miudo">
+    Mapa © colaboradores do <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a>
+  </p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="config.js"></script>
+<script src="ao-vivo.js"></script>
+</body>
+</html>

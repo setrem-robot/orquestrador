@@ -184,7 +184,14 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
-/site
+#
+# A regra original aqui era `/site`, herdada do .gitignore padrao do Python.
+# Este projeto nao usa mkdocs, e a pasta `site/` passou a ser a landing page da
+# Atlas — que precisa ir para o git, porque e dela que o Cloudflare Pages
+# publica. A regra ficou como comentario em vez de sumir: sem isso, alguem que
+# um dia adote mkdocs vai commitar a pasta gerada sem entender por que o
+# template dela nao estava mais aqui.
+#/site
 
 # mypy
 .mypy_cache/
