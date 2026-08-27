@@ -19,7 +19,7 @@ window.ATLAS_API = {
   // é a metade que ninguém faz.
   base: /^(localhost|127\.0\.0\.1|192\.168\.|10\.)/.test(location.hostname)
     ? location.protocol + '//' + location.hostname + ':8000'
-    : 'https://api.seudominio.com.br',
+    : 'https://atlas.kerlonr.com.br',
 
   // De quantos em quantos segundos atualizar. Trinta segundos é bastante para
   // uma página de apresentação, e mantém a VM em paz mesmo com a página
