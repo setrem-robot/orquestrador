@@ -67,8 +67,12 @@ services:
     environment:
       MQTT_HOST: mosquitto
       MQTT_PORT: 1883
-      MQTT_USERNAME: ${MQTT_USERNAME:?defina MQTT_USERNAME no .env}
-      MQTT_PASSWORD: ${MQTT_PASSWORD:?defina MQTT_PASSWORD no .env}
+      # `?` e nao `:?` nas duas linhas abaixo: `:?` recusa a variavel VAZIA, e
+      # vazio aqui e legitimo — e como o ambiente local diz "broker sem senha".
+      # `?` continua recusando a variavel AUSENTE, que e o erro de verdade
+      # (esquecer de copiar o .env.example). Ver docs/ambiente-local.md.
+      MQTT_USERNAME: ${MQTT_USERNAME?defina MQTT_USERNAME no .env (vazio = broker sem senha)}
+      MQTT_PASSWORD: ${MQTT_PASSWORD?defina MQTT_PASSWORD no .env (vazio = broker sem senha)}
       PGHOST: timescaledb
       PGPORT: 5432
       PGUSER: ${PGUSER:-robo}
@@ -89,7 +93,13 @@ services:
       # Cloudflare, abaixo — assim não é preciso abrir porta nenhuma no
       # firewall do LARCC, e o certificado HTTPS vem de graça e renovado.
       # Para testar direto na VM: curl http://127.0.0.1:8000/saude
-      - "127.0.0.1:8000:8000"
+      #
+      # O endereço vem de variável porque o ambiente local precisa de 0.0.0.0
+      # (o celular tem de alcançar) e listas de `ports` são CONCATENADAS quando
+      # o compose é combinado com outro arquivo, não substituídas — declarar a
+      # porta de novo lá faria o Docker tentar abrir a 8000 duas vezes e falhar
+      # com "address already in use". Ver `.env.local.example`.
+      - "${API_BIND:-127.0.0.1}:8000:8000"
     environment:
       PGHOST: timescaledb
       PGPORT: 5432
@@ -128,7 +138,10 @@ services:
     # apresentação é um túnel que cai no meio de uma apresentação.
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina TUNNEL_TOKEN no .env}
+      # `?` pelo mesmo motivo do ingestor: sem tunel o token fica vazio, e o
+      # `:?` faria o compose inteiro recusar a subir por causa de um servico
+      # que nem esta no perfil pedido.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN?defina TUNNEL_TOKEN no .env}
 
 volumes:
   mosquitto_remote_data:

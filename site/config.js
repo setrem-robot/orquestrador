@@ -11,7 +11,15 @@
 // vista de qualquer um que abrisse o inspetor — melhor não fingir que é um.
 window.ATLAS_API = {
   // O domínio publicado pelo túnel da Cloudflare. Sem barra no fim.
-  base: 'https://api.seudominio.com.br',
+  //
+  // Servida da sua máquina (`python3 -m http.server` na pasta `site/`), a
+  // página aponta sozinha para a API do ambiente local, na porta 8000 do mesmo
+  // endereço. Sem isso, testar a landing page localmente exigiria editar este
+  // arquivo e lembrar de desfazer antes de publicar — e o "lembrar de desfazer"
+  // é a metade que ninguém faz.
+  base: /^(localhost|127\.0\.0\.1|192\.168\.|10\.)/.test(location.hostname)
+    ? location.protocol + '//' + location.hostname + ':8000'
+    : 'https://api.seudominio.com.br',
 
   // De quantos em quantos segundos atualizar. Trinta segundos é bastante para
   // uma página de apresentação, e mantém a VM em paz mesmo com a página

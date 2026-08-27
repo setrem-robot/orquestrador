@@ -18,7 +18,10 @@ set -euo pipefail
 CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${CLOUD_DIR}"
 
-COMPOSE=(docker compose -f docker-compose.yml -f compose.local.yml)
+# Preenchido por `exigir_docker`: vazio no caso normal, "sudo" logo depois da
+# instalação, enquanto a sessão ainda não entrou no grupo docker.
+DOCKER_SUDO=""
+COMPOSE=()
 
 BOLD=$(tput bold 2>/dev/null || true)
 RESET=$(tput sgr0 2>/dev/null || true)
@@ -35,14 +38,28 @@ exigir_docker() {
     Instale com:  sudo ./cloud/scripts/instalar-docker-wsl.sh"
 
     if ! docker info >/dev/null 2>&1; then
-        # Os dois motivos possíveis, e eles têm soluções diferentes.
-        if systemctl is-active --quiet docker 2>/dev/null; then
+        systemctl is-active --quiet docker 2>/dev/null \
+            || erro "o serviço do Docker não está de pé: sudo systemctl start docker"
+
+        # O Docker está rodando e esta sessão não alcança o socket. O caso
+        # comum é ter acabado de instalar: o `usermod` já pôs o usuário no
+        # grupo, mas o grupo de um processo é decidido quando ele nasce, e este
+        # terminal nasceu antes. Em vez de mandar reiniciar o WSL e voltar, o
+        # script segue com sudo e avisa — reiniciar continua sendo o certo, só
+        # não precisa ser agora.
+        if sudo -n docker info >/dev/null 2>&1 || sudo docker info >/dev/null 2>&1; then
+            DOCKER_SUDO="sudo"
+            falha "esta sessão ainda não está no grupo docker; seguindo com sudo."
+            info "para parar de precisar dele: feche o terminal, rode 'wsl --shutdown'"
+            info "no PowerShell e abra de novo."
+        else
             erro "o Docker está rodando, mas seu usuário não pode falar com ele.
     Falta entrar no grupo: sudo usermod -aG docker \$USER
     Depois, no PowerShell: wsl --shutdown  (e abra o terminal de novo)"
         fi
-        erro "o serviço do Docker não está de pé: sudo systemctl start docker"
     fi
+
+    COMPOSE=(${DOCKER_SUDO} docker compose -f docker-compose.yml -f compose.local.yml)
 }
 
 # --- endereço que o celular enxerga -----------------------------------------
@@ -204,7 +221,7 @@ if [[ "${TOTAL:-0}" -gt 0 ]]; then
     ok "${TOTAL} mensagens já no banco"
 else
     info "banco vazio; gerando seis horas de histórico para as telas terem o que mostrar"
-    if docker run --rm --network=host -v "${CLOUD_DIR}/scripts:/s:ro" \
+    if ${DOCKER_SUDO} docker run --rm --network=host -v "${CLOUD_DIR}/scripts:/s:ro" \
         -e PGHOST=127.0.0.1 \
         -e PGUSER="$(grep -E '^PGUSER=' .env | cut -d= -f2-)" \
         -e PGPASSWORD="$(grep -E '^PGPASSWORD=' .env | cut -d= -f2-)" \
