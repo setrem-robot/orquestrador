@@ -49,9 +49,23 @@ class Vigia:
     def comando_recebido(self, acao: str, agora: float) -> None:
         """Registra um comando. Movimento arma o vigia; parada desarma."""
         if acao in ACOES_DE_MOVIMENTO:
-            self._ultimo_movimento_em = agora
+            self.movimento_recebido(agora)
         else:
-            self._ultimo_movimento_em = None
+            self.parada_recebida()
+
+    def movimento_recebido(self, agora: float) -> None:
+        """Arma o vigia: há robô andando, e isso precisa continuar sendo pedido.
+
+        Existe ao lado de `comando_recebido` porque nem todo comando diz pelo
+        nome se move ou não: `{"acao":"mover"}` com os dois eixos em zero é uma
+        parada, e com eles fora de zero é movimento. Quem já converteu o comando
+        em velocidade sabe a resposta; o nome da ação, sozinho, não.
+        """
+        self._ultimo_movimento_em = agora
+
+    def parada_recebida(self) -> None:
+        """Desarma o vigia: não há movimento a vigiar."""
+        self._ultimo_movimento_em = None
 
     def expirou(self, agora: float) -> bool:
         """Se o robô deve ser parado por falta de notícias.
