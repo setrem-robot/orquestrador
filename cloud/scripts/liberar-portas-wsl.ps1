@@ -112,7 +112,27 @@ foreach ($item in $Portas) {
             -Protocol TCP `
             -LocalPorts $item.Porta `
             -Action Allow | Out-Null
-        Write-Host "    [ ok ] $($item.Porta)  regra no firewall do Hyper-V  ·  $($item.Descricao)"
+
+        # E TAMBÉM a regra no firewall comum do Windows. No modo espelhado o
+        # pacote que vem do celular entra pela placa de rede do Windows antes de
+        # chegar ao WSL, então ele atravessa os dois firewalls — liberar só o do
+        # Hyper-V deixa o outro barrando, e o sintoma é idêntico ao de não ter
+        # liberado nada. Medido: com só a regra do Hyper-V, nenhuma requisição
+        # do celular chegou a aparecer no log da API.
+        #
+        # `-Profile Any` porque a rede de casa pode estar classificada como
+        # Pública (estava, nesta máquina), e uma regra só para Privada não valeria.
+        Get-NetFirewallRule -DisplayName "$($item.Nome) (WSL)" -ErrorAction SilentlyContinue |
+            Remove-NetFirewallRule -ErrorAction SilentlyContinue
+        New-NetFirewallRule `
+            -DisplayName "$($item.Nome) (WSL)" `
+            -Direction Inbound `
+            -Protocol TCP `
+            -LocalPort $item.Porta `
+            -Profile Any `
+            -Action Allow | Out-Null
+
+        Write-Host "    [ ok ] $($item.Porta)  Hyper-V + firewall do Windows  ·  $($item.Descricao)"
     } else {
         $destino = ($ipWsl | Select-Object -First 1)
         netsh interface portproxy delete v4tov4 listenport=$($item.Porta) listenaddress=0.0.0.0 2>&1 | Out-Null
