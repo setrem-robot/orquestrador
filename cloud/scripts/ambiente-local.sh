@@ -78,6 +78,36 @@ descobrir_endereco() {
     fi
 }
 
+# A rede espelhada resolve o ENDEREÇO, não a PERMISSÃO. Com ela, o WSL passa a
+# ser filtrado pelo firewall do Hyper-V, cuja política de entrada padrão é
+# `Block` — e o sintoma engana: a API responde aqui dentro, responde no
+# localhost do Windows, e não responde para mais ninguém. Inclusive o celular.
+#
+# O teste precisa vir DE FORA do WSL: um curl daqui para o próprio IP da rede
+# passa, porque nem chega a atravessar o firewall. Daí o `powershell.exe`, que
+# só existe quando estamos no WSL — na VM do LARCC esta checagem não roda, e
+# nem faria sentido.
+conferir_firewall_wsl() {
+    command -v powershell.exe >/dev/null 2>&1 || return 0
+
+    local resposta
+    resposta="$(powershell.exe -NoProfile -Command \
+        "try { (Invoke-WebRequest -Uri 'http://${IP_LOCAL}:8000/saude' -TimeoutSec 5 -UseBasicParsing).StatusCode } catch { 'bloqueado' }" \
+        2>/dev/null | tr -d '\r\n ')"
+
+    [[ "${resposta}" == "200" ]] && return 0
+
+    echo
+    falha "de fora do WSL a API NÃO responde — o celular também não vai alcançar."
+    info "falta liberar a porta no firewall do Hyper-V (a rede espelhada sozinha"
+    info "não faz isso). No PowerShell COMO ADMINISTRADOR, nesta pasta:"
+    info ""
+    info "    powershell -ExecutionPolicy Bypass -File .\\cloud\\scripts\\liberar-portas-wsl.ps1"
+    info ""
+    info "O New-NetFirewallRule comum não resolve aqui: ele cria a regra no"
+    info "firewall do Windows, e quem bloqueia é o do Hyper-V. Ver docs/ambiente-local.md."
+}
+
 mostrar_endereco() {
     descobrir_endereco
     TOKEN="$(grep -E '^API_TOKEN=' .env 2>/dev/null | cut -d= -f2- || echo '')"
@@ -90,6 +120,7 @@ mostrar_endereco() {
         echo "    Token:     ${TOKEN}"
         echo
         info "o celular precisa estar no mesmo Wi-Fi que esta máquina"
+        conferir_firewall_wsl
     else
         echo "    Endereço:  http://${IP_LOCAL}:8000     ${BOLD}(só de dentro do WSL)${RESET}"
         echo "    Token:     ${TOKEN}"
