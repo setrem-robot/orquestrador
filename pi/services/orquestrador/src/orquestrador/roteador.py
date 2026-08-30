@@ -17,6 +17,11 @@ Formatos de entrada aceitos (Bluetooth -> ESP32 -> serial_ingestor):
     {"tipo": "voz",    "texto": "olá, tudo bem?"}
     {"tipo": "parada_emergencia"}
 
+  Rota segura (planejada no app, entregue fatiada — ver ComandoRota):
+    {"tipo": "rota", "acao": "inicio", "total": 4, "nome": "volta-quadra"}
+    {"tipo": "rota", "acao": "ponto", "i": 0, "lat": -28.12, "lon": -54.12}
+    {"tipo": "rota", "acao": "fim"}
+
 Veja docs/contrato-mqtt.md para a especificação completa.
 
 Cada tipo de comando é uma subclasse de [ComandoRoteavel] (Command Pattern):
@@ -146,6 +151,70 @@ class ComandoParadaEmergencia(ComandoRoteavel):
         return [(topics.MOTORES_COMANDO, {"acao": "parar", "velocidade": 0})]
 
 
+class ComandoRota(ComandoRoteavel):
+    """tipo: "rota" — a rota segura planejada no app, entregue fatiada.
+
+    A rota chega em mensagens separadas, não numa só: cada linha BLE é limitada
+    a 512 bytes pelo firmware do ESP32, e uma rota com muitos pontos não caberia.
+    Então o app manda `inicio` (quantos pontos vêm), um `ponto` por waypoint e
+    `fim`. Este roteador é sem estado — valida cada mensagem isoladamente e a
+    republica em `robo/rota/comando`; quem remonta a rota inteira é o consumidor
+    (hoje ninguém; é o gancho para um futuro serviço de navegação).
+
+    Como a origem é o app (não-confiável), coordenadas fora da faixa geográfica
+    ou índices malformados são descartados aqui, antes de virarem rota.
+    """
+
+    ACOES_VALIDAS = {"inicio", "ponto", "fim"}
+
+    def rotear(self, cmd: dict[str, Any]) -> list[Publicacao]:
+        acao = cmd.get("acao")
+        if acao not in self.ACOES_VALIDAS:
+            logger.warning("Comando de rota com ação inválida: %r", acao)
+            return []
+
+        if acao == "inicio":
+            total = self._inteiro_nao_negativo(cmd.get("total"))
+            if total is None:
+                logger.warning("Rota 'inicio' sem total válido: %r", cmd)
+                return []
+            payload: dict[str, Any] = {"acao": "inicio", "total": total}
+            nome = cmd.get("nome")
+            if isinstance(nome, str) and nome.strip():
+                payload["nome"] = nome.strip()
+            return [(topics.ROTA_COMANDO, payload)]
+
+        if acao == "fim":
+            return [(topics.ROTA_COMANDO, {"acao": "fim"})]
+
+        # acao == "ponto"
+        indice = self._inteiro_nao_negativo(cmd.get("i"))
+        lat = self._coordenada(cmd.get("lat"), limite=90.0)
+        lon = self._coordenada(cmd.get("lon"), limite=180.0)
+        if indice is None or lat is None or lon is None:
+            logger.warning("Ponto de rota inválido (i/lat/lon): %r", cmd)
+            return []
+        return [(topics.ROTA_COMANDO, {"acao": "ponto", "i": indice, "lat": lat, "lon": lon})]
+
+    @staticmethod
+    def _inteiro_nao_negativo(valor: Any) -> int | None:
+        try:
+            n = int(valor)
+        except (TypeError, ValueError):
+            return None
+        return n if n >= 0 else None
+
+    @staticmethod
+    def _coordenada(valor: Any, *, limite: float) -> float | None:
+        """Número dentro de [-limite, limite], ou None. Fora da faixa não é
+        um ponto no planeta — é lixo de transmissão ou app com defeito."""
+        try:
+            v = float(valor)
+        except (TypeError, ValueError):
+            return None
+        return v if -limite <= v <= limite else None
+
+
 class ComandoWifi(ComandoRoteavel):
     """tipo: "wifi" — repassa provisionamento de Wi-Fi ao serviço wifi."""
 
@@ -169,6 +238,7 @@ _ROTAS: dict[str, ComandoRoteavel] = {
     "voz": ComandoVoz(),
     "parada_emergencia": ComandoParadaEmergencia(),
     "wifi": ComandoWifi(),
+    "rota": ComandoRota(),
 }
 
 
