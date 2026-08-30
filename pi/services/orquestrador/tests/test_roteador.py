@@ -18,6 +18,7 @@ from robo_common import topics
 from orquestrador.roteador import (
     ComandoMotor,
     ComandoParadaEmergencia,
+    ComandoRota,
     ComandoRoteavel,
     ComandoVoz,
     ComandoWifi,
@@ -48,6 +49,7 @@ class TestDespachoPolimorfico(unittest.TestCase):
             (ComandoVoz(), {"texto": "oi"}, topics.VOZ_FALAR),
             (ComandoParadaEmergencia(), {}, topics.MOTORES_COMANDO),
             (ComandoWifi(), {"acao": "conectar", "ssid": "x"}, topics.WIFI_COMANDO),
+            (ComandoRota(), {"acao": "fim"}, topics.ROTA_COMANDO),
         ]
         for comando, entrada, topico_esperado in casos:
             with self.subTest(tipo=type(comando).__name__):
@@ -153,6 +155,56 @@ class TestComandoMoverContinuo(unittest.TestCase):
         # comando que chegou incompleto.
         _, payload = rotear({"tipo": "motor", "acao": "mover", "linear": "rápido"})[0]
         self.assertEqual(payload, {"acao": "mover", "linear": 0.0, "angular": 0.0})
+
+
+class TestComandoRota(unittest.TestCase):
+    """A rota segura chega fatiada: `inicio`, um `ponto` por waypoint, `fim`.
+    Cada mensagem é validada e republicada isoladamente (roteador sem estado).
+    """
+
+    def test_inicio_com_total_e_nome(self):
+        destino, payload = rotear(
+            {"tipo": "rota", "acao": "inicio", "total": 3, "nome": "  volta  "}
+        )[0]
+        self.assertEqual(destino, topics.ROTA_COMANDO)
+        self.assertEqual(payload, {"acao": "inicio", "total": 3, "nome": "volta"})
+
+    def test_inicio_sem_nome_omite_o_campo(self):
+        _, payload = rotear({"tipo": "rota", "acao": "inicio", "total": 0})[0]
+        self.assertEqual(payload, {"acao": "inicio", "total": 0})
+
+    def test_inicio_sem_total_valido_e_descartado(self):
+        self.assertEqual(rotear({"tipo": "rota", "acao": "inicio"}), [])
+        self.assertEqual(rotear({"tipo": "rota", "acao": "inicio", "total": -1}), [])
+
+    def test_ponto_valido(self):
+        _, payload = rotear(
+            {"tipo": "rota", "acao": "ponto", "i": 2, "lat": -28.26, "lon": -54.02}
+        )[0]
+        self.assertEqual(payload, {"acao": "ponto", "i": 2, "lat": -28.26, "lon": -54.02})
+
+    def test_ponto_com_coordenada_fora_do_planeta_e_descartado(self):
+        # Origem é o app (não-confiável): 999 de latitude não é lugar nenhum.
+        self.assertEqual(
+            rotear({"tipo": "rota", "acao": "ponto", "i": 0, "lat": 999, "lon": 0}), []
+        )
+        self.assertEqual(
+            rotear({"tipo": "rota", "acao": "ponto", "i": 0, "lat": 0, "lon": "x"}), []
+        )
+
+    def test_ponto_sem_indice_e_descartado(self):
+        self.assertEqual(
+            rotear({"tipo": "rota", "acao": "ponto", "lat": 0, "lon": 0}), []
+        )
+
+    def test_fim(self):
+        destino, payload = rotear({"tipo": "rota", "acao": "fim"})[0]
+        self.assertEqual(destino, topics.ROTA_COMANDO)
+        self.assertEqual(payload, {"acao": "fim"})
+
+    def test_acao_desconhecida_e_descartada(self):
+        self.assertEqual(rotear({"tipo": "rota", "acao": "apagar"}), [])
+        self.assertEqual(rotear({"tipo": "rota"}), [])
 
 
 if __name__ == "__main__":
