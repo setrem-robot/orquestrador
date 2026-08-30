@@ -70,6 +70,9 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
 {"tipo": "voz", "texto": "olá, tudo bem?"}
 {"tipo": "parada_emergencia"}
 {"tipo": "wifi", "acao": "conectar", "ssid": "MinhaRede", "senha": "segredo"}
+{"tipo": "rota", "acao": "inicio", "total": 4, "nome": "volta-quadra"}
+{"tipo": "rota", "acao": "ponto", "i": 0, "lat": -28.2612, "lon": -54.0234}
+{"tipo": "rota", "acao": "fim"}
 ```
 
 - `motor.acao` ∈ `{frente, tras, esquerda, direita, parar, mover}`;
@@ -82,6 +85,14 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
   existindo e são atalhos para o mesmo cálculo — ver
   `pi/services/motores/src/motores/cinematica.py`.
 - `wifi.acao` ∈ `{conectar, listar, status}` (default `conectar`).
+- `rota.acao` ∈ `{inicio, ponto, fim}`. A **rota segura** é planejada no app e
+  entregue **fatiada**, porque uma linha BLE é limitada a 512 bytes pelo
+  firmware do ESP32 e uma rota com muitos pontos não caberia numa mensagem só. O
+  app manda `inicio` (com `total`, e `nome` opcional), um `ponto` por waypoint
+  (`i` = índice ≥ 0, `lat`/`lon` na faixa geográfica válida) e `fim`. O
+  orquestrador valida e republica cada mensagem em `robo/rota/comando` — ele é
+  **sem estado**: quem remonta a rota inteira é o consumidor. Pontos com
+  coordenada fora do planeta ou índice malformado são descartados.
 - Comandos desconhecidos ou malformados são descartados (logados, não derrubam
   o serviço).
 
@@ -135,6 +146,19 @@ Comando de Wi-Fi repassado ao serviço `wifi`, que valida e aplica via `nmcli`.
 ```json
 {"acao": "conectar", "ssid": "MinhaRede", "senha": "segredo"}
 ```
+
+### `robo/rota/comando`
+Cada mensagem da rota segura, já validada, republicada pelo orquestrador.
+```json
+{"acao": "inicio", "total": 4, "nome": "volta-quadra"}
+{"acao": "ponto", "i": 0, "lat": -28.2612, "lon": -54.0234}
+{"acao": "fim"}
+```
+> **Sem consumidor hoje.** Nenhum serviço assina este tópico ainda — o robô
+> segue teleoperado, e a rota é um guia planejado no app. Este tópico é o gancho
+> para um futuro serviço de navegação que *siga* a rota (malha fechada de GPS),
+> que precisa de um Raspberry Pi real para ser desenvolvido e ajustado. Enquanto
+> não existir, `robo/rota/*` também não é espelhado para a nuvem.
 
 ## Status e telemetria (produzidos pelos serviços)
 

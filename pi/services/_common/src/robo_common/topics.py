@@ -24,6 +24,12 @@ VOZ_FALAR = f"{ROOT}/voz/falar"
 # --- GPS ---
 GPS_POSICAO = f"{ROOT}/gps/posicao"
 
+# --- Rota segura (planejada no app) ---
+# O app envia a rota fatiada (inicio/ponto/fim) pelo mesmo caminho dos comandos;
+# o orquestrador valida cada mensagem e a republica aqui. Sem consumidor hoje: é
+# o gancho para um futuro serviço de navegação que siga a rota.
+ROTA_COMANDO = f"{ROOT}/rota/comando"
+
 # --- Wi-Fi ---
 # Comando de provisionamento roteado pelo orquestrador para o serviço wifi.
 # Chega originalmente como {"tipo":"wifi",...} no comando vindo do app.
