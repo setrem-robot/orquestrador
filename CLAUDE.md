@@ -6,6 +6,13 @@ na nuvem. Para setup e o contrato MQTT completo, leia primeiro
 `setup-esp32.md`, `setup-pi.md`, `setup-cloud.md`). Este arquivo cobre o que
 essa documentação não cobre.
 
+**Antes de qualquer coisa que atravesse a borda deste repositório**, leia
+**[`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md)** — o mapa das três frentes
+(app, cara e corpo), quem fala com quem e por qual transporte. A §0 dele diz o
+que está **de fato** instalado no robô hoje, que não é o mesmo que o diagrama
+mostra: os serviços do `pi/services/` **não** estão no Pi, e é por isso que um
+comando de direção chega em `robo/comando/entrada` e para ali.
+
 ## As três frentes, uma frase cada
 
 - **`esp32/`** — firmware C++/Arduino. Ponte BLE ↔ Serial: valida JSON e
