@@ -108,36 +108,65 @@ Conferido por SSH no mesmo dia:
 
 ## 1. O sistema numa tela
 
-```
-   ┌───────────────┐        BLE (NUS)         ┌──────────────────────────────────┐
-   │  App Flutter  │  {"cmd":"F"}\n           │            Raspberry Pi           │
-   │  (aplicativo) │ ───────────────────────► │                                  │
-   │               │  {"tipo":"rota",...}\n    │  ┌────────────┐   MQTT (:1883)    │
-   └──────┬────────┘        │                 │  │  ponte BLE │──► robo/comando/  │
-          │                 │                 │  │ (ESP32 OU  │      entrada      │
-          │                 ▼                 │  │  o Pi)     │        │          │
-          │          ┌────────────┐           │  └────────────┘        ▼          │
-          │          │   ESP32    │  Serial   │  ┌──────────────────────────────┐│
-          │          │ ble_bridge │ ────────► │  │  orquestrador (roteador)     ││
-          │          └────────────┘           │  │  robo/comando/entrada        ││
-          │                                   │  │    ├─► robo/motores/comando  ││
-          │                                   │  │    ├─► robo/voz/falar        ││
-          │                                   │  │    ├─► robo/wifi/comando     ││
-          │                                   │  │    └─► robo/rota/comando 🆕  ││
-          │                                   │  └──────────────────────────────┘│
-          │                                   │   motores │ gps │ wifi │ RobotEye │
-          │                                   └───────┬──────────────────────────┘
-          │  HTTP (leitura)                           │ MQTT → ingestor
-          │  api.<dominio>/v1/...                      ▼
-          └─────────────────────────────►  ┌────────────────────────┐
-                                           │  Nuvem (Docker/LARCC)  │
-   ┌───────────────┐   HTTP (público)      │  Mosquitto + ingestor  │
-   │  Landing site │ ────────────────────► │  + TimescaleDB + API   │
-   │   (site/)     │  api.<dominio>/v1/    │  + Cloudflare Tunnel   │
-   └───────────────┘        publico/...    └────────────────────────┘
+```mermaid
+flowchart TB
+    APP["APP FLUTTER<br/>aplicativo"]
+    SITE["LANDING PAGE<br/>site/"]
+    PC["Maquina da IA<br/>Ollama, outro computador"]
 
-   RobotEye (a cara) também fala com o Ollama (a IA) por HTTP, em OUTRA máquina.
+    subgraph PI["RASPBERRY PI"]
+        direction TB
+        PONTE["Ponte BLE<br/>ESP32 ou o proprio Pi"]
+        BROKER[("mosquitto :1883")]
+        ROT["orquestrador<br/>o roteador"]
+        MOT["motores"]
+        GPS["gps"]
+        WIFI["wifi"]
+        CARA["RobotEye<br/>face, voz e IA"]
+        FUTURO["navegacao<br/>ainda nao existe"]
+    end
+
+    subgraph NUVEM["NUVEM - VM do LARCC"]
+        direction TB
+        BRK2[("mosquitto remoto")]
+        INGC["ingestor"]
+        DB[("TimescaleDB")]
+        API["API FastAPI<br/>so leitura"]
+    end
+
+    APP -- "BLE - JSON por linha" --> PONTE
+    PONTE -- "robo/comando/entrada" --> BROKER
+    BROKER --> ROT
+    ROT -- "robo/motores/comando" --> MOT
+    ROT -- "robo/wifi/comando" --> WIFI
+    ROT -. "robo/voz/falar" .-> CARA
+    ROT -. "robo/rota/comando" .-> FUTURO
+    GPS -- "robo/gps/posicao" --> BROKER
+    MOT -- "robo/motores/status" --> BROKER
+    ROT -- "espelha robo/telemetria/#" --> BRK2
+    BRK2 --> INGC --> DB --> API
+    API -- "HTTPS com token" --> APP
+    API -- "HTTPS sem token" --> SITE
+    CARA -- "HTTP" --> PC
 ```
+
+> **Duas ressalvas importantes sobre este diagrama.**
+>
+> 1. Ele mostra o sistema **projetado**. Hoje, no robô real, os serviços do
+>    `orquestrador` (o roteador, `motores`, `gps`, `wifi`) **não estão
+>    instalados** — ver a §0. As setas que saem do broker para eles são planta,
+>    não construção.
+> 2. As setas para `robo/voz/falar` e `robo/rota/comando` mostram para onde o
+>    roteador publica. **Ninguém consome esses dois tópicos ainda** — são
+>    ganchos para trabalho futuro (§6).
+
+Para entender cada repositório por dentro, há um passeio guiado em cada um:
+
+| Repositório | Passeio guiado |
+|---|---|
+| `atlas_ai_v2` — a cara | [`../RobotEye/COMO-FUNCIONA.md`](../RobotEye/COMO-FUNCIONA.md) |
+| `orquestrador` — o corpo | [`COMO-FUNCIONA.md`](./COMO-FUNCIONA.md) |
+| `aplicativo` — o controle | [`../app/COMO-FUNCIONA.md`](../app/COMO-FUNCIONA.md) |
 
 ---
 

@@ -1,5 +1,10 @@
 # orquestrador — o corpo da Atlas
 
+> **Primeira vez aqui?** Comece por **[`COMO-FUNCIONA.md`](./COMO-FUNCIONA.md)**
+> — um passeio guiado de quinze minutos pela arquitetura, com diagramas. Para as
+> fronteiras com os outros dois repositórios, veja
+> [`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md).
+
 Este repositório é a parte da Atlas que **se move, se localiza e se comunica**:
 os serviços que rodam no Raspberry Pi, o firmware do ESP32 e a nuvem que guarda
 e serve a telemetria.

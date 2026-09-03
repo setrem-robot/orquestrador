@@ -6,6 +6,11 @@ na nuvem. Para setup e o contrato MQTT completo, leia primeiro
 `setup-esp32.md`, `setup-pi.md`, `setup-cloud.md`). Este arquivo cobre o que
 essa documentação não cobre.
 
+**Como o repositório funciona, ponta a ponta:**
+[`COMO-FUNCIONA.md`](./COMO-FUNCIONA.md) — o caminho de um comando desde o dedo
+no botão até o motor, o de volta da telemetria, e as decisões que explicam o
+desenho.
+
 **Antes de qualquer coisa que atravesse a borda deste repositório**, leia
 **[`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md)** — o mapa das três frentes
 (app, cara e corpo), quem fala com quem e por qual transporte. A §0 dele diz o
