@@ -82,9 +82,44 @@ class TestLimitador(unittest.TestCase):
         from app.seguranca import Limitador
 
         # Janela de zero: toda batida anterior já está velha na batida seguinte.
+        #
+        # Este teste falhava no Windows e passava no Linux, e a culpa não era do
+        # teste: `time.monotonic()` anda de 15 em 15 ms no Windows/Python 3.12,
+        # então duas chamadas seguidas devolvem o mesmo instante. Com a expiração
+        # escrita como `> janela`, uma batida de idade exatamente zero nunca saía
+        # de uma janela de tamanho zero, e a fila não esvaziava nunca.
         limitador = Limitador(teto=1, janela_s=0.0)
         self.assertTrue(limitador.permitir("1.2.3.4"))
         self.assertTrue(limitador.permitir("1.2.3.4"))
+
+
+class TestCacheCurto(unittest.TestCase):
+    """O resumo público é a consulta mais cara servida sem token."""
+
+    def test_devolve_o_que_guardou(self):
+        from app.seguranca import CacheCurto
+
+        cache = CacheCurto(60.0)
+        self.assertIsNone(cache.obter())
+        cache.guardar({"tipos": []})
+        self.assertEqual(cache.obter(), {"tipos": []})
+
+    def test_validade_zero_nao_guarda_nada(self):
+        """Serve para desligar o cache pela configuração, sem tirar o código."""
+        from app.seguranca import CacheCurto
+
+        cache = CacheCurto(0.0)
+        cache.guardar({"tipos": []})
+        self.assertIsNone(cache.obter())
+
+    def test_o_valor_vence_com_o_tempo(self):
+        from app import seguranca
+
+        cache = seguranca.CacheCurto(10.0)
+        cache.guardar("velho")
+        # Sem esperar de verdade: o relógio é o do módulo, e ele pode andar.
+        cache._gravado_em -= 11.0
+        self.assertIsNone(cache.obter())
 
 
 if __name__ == "__main__":

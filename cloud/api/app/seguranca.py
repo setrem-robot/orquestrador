@@ -39,6 +39,48 @@ PUBLICO_HABILITADO = os.environ.get("PUBLICO_HABILITADO", "true").lower() in {
     "on",
 }
 
+#: Se dá para acreditar no `CF-Connecting-IP` / `X-Forwarded-For` que chegam.
+#:
+#: Atrás do túnel da Cloudflare o IP da conexão é sempre o do `cloudflared`, e
+#: limitar por ele limitaria todo mundo junto — por isso o padrão é confiar. Mas
+#: cabeçalho é texto que o cliente escreve: **quem alcançar a API por fora do
+#: túnel escolhe a própria identidade e o limitador deixa de existir**, porque
+#: cada requisição inventa um IP novo. Só o túnel alcança esta API, e é isso que
+#: torna o padrão aceitável; publicando a porta de outro jeito, desligue aqui.
+CONFIAR_EM_PROXY = os.environ.get("CONFIAR_EM_PROXY", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+#: Por quantos segundos guardar a resposta do resumo público.
+#:
+#: `resumo()` conta a tabela inteira, não tem recorte de tempo e é servido **sem
+#: token**: quanto mais histórico o robô junta, mais cara ela fica, e qualquer
+#: um pode pedi-la. Guardar a resposta por um minuto faz o custo parar de
+#: depender de quantas pessoas abriram a página — a landing atualiza a cada 30 s,
+#: então ninguém percebe a diferença.
+CACHE_RESUMO_S = float(os.environ.get("CACHE_RESUMO_S", "60"))
+
+
+class CacheCurto:
+    """Guarda um valor por alguns segundos. Um só, e sem thread de limpeza."""
+
+    def __init__(self, validade_s: float) -> None:
+        self._validade = validade_s
+        self._valor: object | None = None
+        self._gravado_em = 0.0
+
+    def obter(self):
+        if self._valor is None or time.monotonic() - self._gravado_em >= self._validade:
+            return None
+        return self._valor
+
+    def guardar(self, valor) -> None:
+        self._valor = valor
+        self._gravado_em = time.monotonic()
+
 
 def token_configurado() -> bool:
     return bool(TOKEN)
@@ -85,7 +127,11 @@ class Limitador:
     def permitir(self, chave: str) -> bool:
         agora = time.monotonic()
         fila = self._batidas[chave]
-        while fila and agora - fila[0] > self._janela:
+        # `>=` e não `>`: uma batida com exatamente a idade da janela já saiu
+        # dela. Com `>`, duas chamadas que o relógio não consegue separar (o
+        # `time.monotonic()` do Windows anda de 15 em 15 ms) contavam como
+        # simultâneas para sempre, e a janela nunca expirava.
+        while fila and agora - fila[0] >= self._janela:
             fila.popleft()
         if len(fila) >= self._teto:
             return False

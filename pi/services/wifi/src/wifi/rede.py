@@ -149,8 +149,21 @@ def processar(comando: dict[str, Any], iface: str) -> dict[str, Any]:
             if not isinstance(ssid, str) or not ssid.strip():
                 return {"ok": False, "acao": "conectar", "erro": "ssid_obrigatorio"}
             # Aceita "senha" (pt) ou "password" (en); rede aberta -> "".
+            #
+            # O `isinstance` não é preciosismo: sem ele, uma senha que chegasse
+            # como número ou lista ia direto para a lista de argumentos do
+            # `subprocess`, que exige texto — e o `TypeError` resultante não é
+            # `ErroRede`, então escapava deste `try` e quebrava a promessa do
+            # módulo de nunca levantar para fora.
             senha = comando.get("senha") or comando.get("password") or ""
+            if not isinstance(senha, str):
+                return {"ok": False, "acao": "conectar", "erro": "senha_invalida"}
             ssid = ssid.strip()
+            # Um SSID começando com "-" seria lido pelo `nmcli` como opção, e
+            # não como nome de rede. Não é injeção de shell (não há shell aqui),
+            # mas é o cliente escolhendo qual comando o robô executa.
+            if ssid.startswith("-"):
+                return {"ok": False, "acao": "conectar", "erro": "ssid_invalido"}
             resultado = conectar(ssid, senha, iface)
             logger.info("Conectado à rede %r (ip=%s).", ssid, resultado.get("ip"))
             return {"ok": True, "acao": "conectar", "ssid": ssid, **resultado}

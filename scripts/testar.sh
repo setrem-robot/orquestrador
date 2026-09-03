@@ -62,7 +62,11 @@ testar_api() {
     passo "API da nuvem"
     docker run --rm -v "${RAIZ}/cloud/api":/w -w /w "${IMAGEM}" sh -c '
         set -e
-        pip install -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt pytest
+        # `requirements-dev.txt` e não `requirements.txt` + pytest: a suíte usa
+        # o `TestClient` do FastAPI, que é construído sobre o `httpx` — e o
+        # `httpx` não é dependência de rodar a API, só de testá-la. Sem ele,
+        # `tests/test_cabecalhos.py` falha já na coleta.
+        pip install -q --root-user-action=ignore --disable-pip-version-check -r requirements-dev.txt
         python -m pytest -q tests/
     ' && ok "API da nuvem" || { falha "API da nuvem"; FALHOU=1; }
 }

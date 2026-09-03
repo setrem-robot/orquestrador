@@ -49,6 +49,10 @@ banco = Banco()
 #: apertado o bastante para uma aba esquecida não derrubar a VM.
 limitador = seguranca.Limitador(teto=120, janela_s=60.0)
 
+#: A resposta do resumo público, guardada por alguns segundos. Ver
+#: `resumo_publico` e `seguranca.CACHE_RESUMO_S`.
+_cache_resumo = seguranca.CacheCurto(seguranca.CACHE_RESUMO_S)
+
 
 @asynccontextmanager
 async def ciclo_de_vida(_: FastAPI):
@@ -122,13 +126,15 @@ def _cliente(request: Request) -> str:
     Atrás do túnel da Cloudflare o IP da conexão é sempre o do `cloudflared`,
     e limitar por ele limitaria todo mundo junto. `CF-Connecting-IP` é o
     cabeçalho que a Cloudflare põe com o IP real — e só dá para confiar nele
-    porque nada além do túnel alcança esta API.
+    porque nada além do túnel alcança esta API. Ver `CONFIAR_EM_PROXY`, que é
+    onde essa suposição vira uma chave que dá para desligar.
     """
-    real = request.headers.get("CF-Connecting-IP") or request.headers.get(
-        "X-Forwarded-For", ""
-    )
-    if real:
-        return real.split(",")[0].strip()
+    if seguranca.CONFIAR_EM_PROXY:
+        real = request.headers.get("CF-Connecting-IP") or request.headers.get(
+            "X-Forwarded-For", ""
+        )
+        if real:
+            return real.split(",")[0].strip()
     return request.client.host if request.client else "desconhecido"
 
 
@@ -261,10 +267,20 @@ async def resumo_publico() -> dict:
     """Quantas mensagens de cada tipo, e quando foi a última.
 
     Mostra que o robô existe e está vivo sem contar onde ele está.
+
+    A resposta fica guardada por um minuto (`CACHE_RESUMO_S`): esta é a
+    consulta mais cara da API — conta a tabela inteira, sem recorte de tempo —
+    e é a única cara que se serve **sem token**. Sem o cache, o custo cresceria
+    com o histórico e com o número de pessoas com a página aberta ao mesmo
+    tempo; com ele, é uma consulta por minuto e pronto.
     """
+    guardado = _cache_resumo.obter()
+    if guardado is not None:
+        return guardado
+
     linhas = banco.consultar(*consultas.resumo())
     agora = consultas.agora()
-    return {
+    resposta = {
         "gerado_em": _iso(agora),
         "tipos": [
             {
@@ -276,6 +292,8 @@ async def resumo_publico() -> dict:
             for tipo, total, ultima in linhas
         ],
     }
+    _cache_resumo.guardar(resposta)
+    return resposta
 
 
 @app.get("/v1/publico/trajeto", tags=["público"], dependencies=[Depends(porta_publica)])

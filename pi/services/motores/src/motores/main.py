@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import threading
 import time
 from typing import Any
 
@@ -95,6 +96,17 @@ class ServicoMotores:
 
     Fica separado de `main()` para poder ser exercitado com `tick()` num teste:
     sem broker, sem GPIO e sem esperar em tempo real.
+
+    **Duas threads entram aqui, e é por isso que há um cadeado.** `receber()` é
+    chamado pela thread de rede do paho, quando uma mensagem chega; `tick()`,
+    pelo laço de `main()`, vinte vezes por segundo. Os dois mexem na mesma
+    rampa, no mesmo vigia e no mesmo acionamento.
+
+    Sem o cadeado, a sequência que assusta é esta: chega uma parada de
+    emergência, `receber()` zera a rampa e manda parar — e o `tick()` que já
+    estava no meio do caminho aplica, logo depois, a velocidade que leu antes
+    da parada. O robô recebe "pare" e continua andando. É raro, é intermitente,
+    e é exatamente o tipo de coisa que não se reproduz com o robô no chão.
     """
 
     def __init__(
@@ -114,10 +126,17 @@ class ServicoMotores:
         self._timeout_s = timeout_s
         self._publicar = publicar_status
         self._ultimo_status: dict[str, Any] | None = None
+        #: Serializa `receber()` (thread do paho) com `tick()` (laço de
+        #: `main`). Ver o porquê no docstring da classe.
+        self._cadeado = threading.RLock()
 
     # -- entrada -----------------------------------------------------------
     def receber(self, comando: dict[str, Any], agora: float) -> None:
         """Aceita um comando do contrato MQTT e o transforma em alvo."""
+        with self._cadeado:
+            self._receber(comando, agora)
+
+    def _receber(self, comando: dict[str, Any], agora: float) -> None:
         acao = str(comando.get("acao", ""))
         if acao not in ACOES_VALIDAS:
             logger.warning("Ação de motor inválida: '%s'; ignorando.", acao)
@@ -150,25 +169,28 @@ class ServicoMotores:
 
     def parada_de_emergencia(self, motivo: str) -> None:
         """Para tudo sem rampa, e conta o porquê."""
-        logger.warning("Parada de emergência: %s", motivo)
-        self._vigia.parada_recebida()
-        self._acionamento.aplicar(self._rampa.parar_agora())
-        self._anunciar("parar", Velocidades(), motivo=motivo)
+        with self._cadeado:
+            logger.warning("Parada de emergência: %s", motivo)
+            self._vigia.parada_recebida()
+            self._acionamento.aplicar(self._rampa.parar_agora())
+            self._anunciar("parar", Velocidades(), motivo=motivo)
 
     # -- tempo -------------------------------------------------------------
     def tick(self, dt: float, agora: float) -> None:
         """Uma volta do laço: vigia o silêncio e avança a rampa."""
-        if self._vigia.expirou(agora):
-            self.parada_de_emergencia(
-                f"nenhum comando de movimento há {self._timeout_s:.1f}s — o controle "
-                "caiu, ou o app não está repetindo o comando"
-            )
-            return
-        self._acionamento.aplicar(self._rampa.avancar(dt))
+        with self._cadeado:
+            if self._vigia.expirou(agora):
+                self.parada_de_emergencia(
+                    f"nenhum comando de movimento há {self._timeout_s:.1f}s — o controle "
+                    "caiu, ou o app não está repetindo o comando"
+                )
+                return
+            self._acionamento.aplicar(self._rampa.avancar(dt))
 
     def encerrar(self) -> None:
-        self._acionamento.parar()
-        self._acionamento.fechar()
+        with self._cadeado:
+            self._acionamento.parar()
+            self._acionamento.fechar()
 
     # -- saída -------------------------------------------------------------
     def _anunciar(self, acao: str, alvo: Velocidades, *, motivo: str = "") -> None:

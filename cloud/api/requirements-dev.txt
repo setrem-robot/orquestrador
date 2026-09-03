@@ -1,0 +1,13 @@
+# O que os testes da API precisam, além do que a API precisa para rodar.
+#
+# Separado do `requirements.txt` de propósito: a imagem que vai para a VM não
+# leva ferramenta de teste junto. Mas as duas listas precisam existir — sem
+# esta, `tests/test_cabecalhos.py` não importa (`fastapi.testclient` é
+# construído sobre o `httpx`) e a suíte inteira falha na coleta, com uma
+# mensagem que fala de `httpx` e não do que está faltando.
+-r requirements.txt
+
+# `TestClient` do Starlette/FastAPI roda em cima dele.
+httpx>=0.27
+
+pytest>=8.0

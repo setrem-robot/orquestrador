@@ -6,6 +6,13 @@ na nuvem. Para setup e o contrato MQTT completo, leia primeiro
 `setup-esp32.md`, `setup-pi.md`, `setup-cloud.md`). Este arquivo cobre o que
 essa documentação não cobre.
 
+**Antes de qualquer coisa que atravesse a borda deste repositório**, leia
+**[`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md)** — o mapa das três frentes
+(app, cara e corpo), quem fala com quem e por qual transporte. A §0 dele diz o
+que está **de fato** instalado no robô hoje, que não é o mesmo que o diagrama
+mostra: os serviços do `pi/services/` **não** estão no Pi, e é por isso que um
+comando de direção chega em `robo/comando/entrada` e para ali.
+
 ## As três frentes, uma frase cada
 
 - **`esp32/`** — firmware C++/Arduino. Ponte BLE ↔ Serial: valida JSON e
@@ -39,11 +46,16 @@ de telemetria.
 `cloud/api/app/consultas.py` devolve `(sql, parametros)` e **não toca no
 banco** — mesmo desenho de `roteador.py` e `motores/cinematica.py`, pelo mesmo
 motivo: o que erra por descuido (limite não saturado, campo entrando no SQL sem
-validação) fica testável sem infraestrutura. 27 testes:
+validação) fica testável sem infraestrutura. 37 testes:
 
 ```bash
-cd cloud/api && python3 -m unittest discover -s tests
+cd cloud/api
+python3 -m pip install -r requirements-dev.txt   # httpx: o TestClient roda nele
+python3 -m unittest discover -s tests
 ```
+
+Sem o `requirements-dev.txt` a suíte falha na coleta de `test_cabecalhos.py`
+com uma mensagem sobre `httpx`, que não é o que está faltando.
 
 **O `intervalo` e o `campo` são interpolados no SQL** — `time_bucket` e o
 operador `->>` não aceitam parâmetro para eles. Por isso o primeiro vem de uma
@@ -81,6 +93,16 @@ de um movimento** — e prefira a resposta que para o robô.
 instante): 12 testes em `pi/services/motores/tests/`, sem hardware e sem esperar
 em tempo real.
 
+**E há uma quarta camada, invisível: o cadeado.** `receber()` roda na thread de
+rede do paho e `tick()` no laço de `main()`, e os dois mexem na mesma rampa, no
+mesmo vigia e no mesmo acionamento. Sem exclusão mútua, um `tick()` que já
+estava em curso pode aplicar, **depois** de uma parada de emergência, a
+velocidade que tinha lido antes dela — o robô recebe "pare" e continua andando.
+`ServicoMotores` serializa as duas entradas com um `RLock` (reentrante porque
+`tick()` chama `parada_de_emergencia()`, que também tranca), e
+`tests/test_concorrencia.py` prova que ninguém entra na região crítica no meio
+de um `aplicar`.
+
 ## `roteador.py` é Command Pattern, não dict de funções
 
 `pi/services/orquestrador/src/orquestrador/roteador.py` foi refatorado para
@@ -90,7 +112,7 @@ ABC (`abc.ABC` + `@abstractmethod`), e cada tipo de comando do app
 registrada em `_ROTAS: dict[str, ComandoRoteavel]`. A função pública
 `rotear()` despacha polimorficamente — `_ROTAS[tipo].rotear(comando)` —
 sem saber qual subclasse está do outro lado. Testes em
-`pi/services/orquestrador/tests/test_roteador.py` (19 casos, `unittest`,
+`pi/services/orquestrador/tests/test_roteador.py` (30 casos, `unittest`,
 sem broker MQTT nem hardware) comprovam isso, inclusive que
 `ComandoRoteavel()` sozinha não instancia (`TypeError`).
 
@@ -103,11 +125,21 @@ cd pi/services/orquestrador && python -m unittest discover -s tests -v
 ```
 
 **O que ainda não foi refatorado:** unificar o `_parar`/`_tratar_sinal`
-duplicado nos 5 `main.py`, e dar classes a `wifi/rede.py`. Tocam serviços que
-mexem com hardware (GPS, Wi-Fi do sistema) e não há como testá-los sem um
-Raspberry Pi real. Ficam documentados aqui como próximo passo, não como
-pendência esquecida — e o caminho já está aberto: foi exatamente assim que os
-motores deixaram de precisar do robô montado (ver abaixo).
+duplicado nos 5 `main.py`, e dar classes a `wifi/rede.py`. Ficam documentados
+aqui como próximo passo, não como pendência esquecida — e o caminho já está
+aberto: foi exatamente assim que os motores deixaram de precisar do robô
+montado (ver abaixo).
+
+**`wifi/rede.py` já tem teste**, e a linha que dizia o contrário estava errada:
+o que precisa de Raspberry Pi é falar com o `nmcli`, não decidir *se* vai falar.
+`processar()` recebe um dict do app e devolve outro; trocando `_run_nmcli` por
+um dublê, os 16 testes de `pi/services/wifi/tests/` cobrem a validação inteira —
+que é a parte que importa, porque esse comando chega por um rádio BLE que não
+pede senha a ninguém.
+
+```bash
+cd pi/services/wifi && PYTHONPATH="src:../_common/src" python -m unittest discover -s tests
+```
 
 ## Já orientado a objetos, sem precisar de refactor
 
@@ -140,7 +172,7 @@ custavam duas mil voltas de laço por segundo. Hoje o pino STEP recebe uma onda
 quadrada do PWM (gpiozero → lgpio), a frequência **é** a quantidade de passos
 por segundo, e mudar a velocidade é escrever um número.
 
-Rodar os 45 testes (sem Pi, sem motor, sem broker):
+Rodar os 52 testes (sem Pi, sem motor, sem broker):
 
 ```bash
 cd pi/services/motores && PYTHONPATH="src:../_common/src" python -m unittest discover -s tests
