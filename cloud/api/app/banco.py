@@ -22,24 +22,36 @@ from psycopg_pool import ConnectionPool
 
 logger = logging.getLogger("api.banco")
 
+#: Teto de tempo de uma consulta. Um gráfico que demorasse mais que isto seria
+#: uma pergunta grande demais, e é melhor devolver erro do que prender uma
+#: conexão do pool enquanto o celular já desistiu.
+TIMEOUT_CONSULTA_MS = 8000
+
 CONNINFO = (
     f"host={os.environ.get('PGHOST', 'timescaledb')} "
     f"port={os.environ.get('PGPORT', '5432')} "
     f"user={os.environ.get('PGUSER', 'robo')} "
     f"password={os.environ.get('PGPASSWORD', '')} "
-    f"dbname={os.environ.get('PGDATABASE', 'robo')}"
+    f"dbname={os.environ.get('PGDATABASE', 'robo')} "
+    # O teto de tempo entra na própria conexão, e não num `SET` por cursor.
+    #
+    # Antes era `SET LOCAL statement_timeout` dentro do cursor — e `SET LOCAL`
+    # vale até o fim da transação corrente. Com `autocommit=True` cada comando
+    # é a sua própria transação, então aquele `SET LOCAL` acabava no instante
+    # em que era executado: o teto **nunca valeu para a consulta seguinte**.
+    # Uma pergunta cara podia prender uma das quatro conexões do pool para
+    # sempre, que é exatamente o que este número existe para impedir.
+    #
+    # Aqui ele é um parâmetro de arranque da sessão: vale para toda conexão
+    # que o pool abrir, inclusive as que ele reabre sozinho depois de o
+    # Postgres reiniciar.
+    f"options=-c statement_timeout={TIMEOUT_CONSULTA_MS}"
 )
 
 #: Quantas conexões manter. Quatro cobre com folga um punhado de celulares e a
 #: landing page: cada consulta dura milissegundos, então elas se revezam.
 POOL_MIN = 1
 POOL_MAX = 4
-
-#: Teto de tempo de uma consulta. Um gráfico que demorasse mais que isto seria
-#: uma pergunta grande demais, e é melhor devolver erro do que prender uma
-#: conexão do pool enquanto o celular já desistiu.
-TIMEOUT_CONSULTA_MS = 8000
-
 
 class Banco:
     """Pool de conexões, aberto sob demanda.
@@ -74,9 +86,10 @@ class Banco:
 
     @contextmanager
     def cursor(self) -> Iterator[Any]:
+        # O `statement_timeout` vem do `CONNINFO`, e não de um `SET` aqui —
+        # ver o comentário lá em cima sobre por que `SET LOCAL` não valia.
         with self._pool.connection(timeout=5.0) as conexao:
             with conexao.cursor() as cur:
-                cur.execute(f"SET LOCAL statement_timeout = {TIMEOUT_CONSULTA_MS}")
                 yield cur
 
     def consultar(self, sql: str, parametros: tuple = ()) -> list[tuple]:

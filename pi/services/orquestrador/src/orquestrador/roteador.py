@@ -262,7 +262,12 @@ def rotear(comando: dict[str, Any]) -> list[Publicacao]:
         return _ROTAS["motor"].rotear({"acao": acao, "velocidade": VELOCIDADE_PADRAO})
 
     tipo = comando.get("tipo")
-    rota = _ROTAS.get(tipo)
+    # `isinstance` antes do `get`: um "tipo" que veio como lista ou dicionário
+    # não é hashável, e `_ROTAS.get(...)` levanta `TypeError` em vez de devolver
+    # `None`. A promessa deste módulo — "nunca levanta exceção, porque a entrada
+    # vem de um cliente externo não-confiável" — cai justamente no comando mais
+    # malformado de todos.
+    rota = _ROTAS.get(tipo) if isinstance(tipo, str) else None
     if rota is None:
         logger.warning("Comando de tipo desconhecido: %r", tipo)
         return []
