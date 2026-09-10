@@ -45,7 +45,14 @@ CONNINFO = (
     # Aqui ele é um parâmetro de arranque da sessão: vale para toda conexão
     # que o pool abrir, inclusive as que ele reabre sozinho depois de o
     # Postgres reiniciar.
-    f"options=-c statement_timeout={TIMEOUT_CONSULTA_MS}"
+    #
+    # As aspas em volta do valor não são enfeite. Uma conninfo é quebrada em
+    # espaços, e o valor deste campo — `-c statement_timeout=8000` — TEM um
+    # espaço no meio. Sem aspas, o libpq lia `options=-c` e depois
+    # `statement_timeout=8000` como um segundo campo, que não existe, e recusava
+    # a conexão inteira com `invalid connection option "statement_timeout"`. A
+    # API subia e respondia 503 em toda rota, porque nenhuma conexão abria.
+    f"options='-c statement_timeout={TIMEOUT_CONSULTA_MS}'"
 )
 
 #: Quantas conexões manter. Quatro cobre com folga um punhado de celulares e a
