@@ -3,11 +3,18 @@
 # Separado do `requirements.txt` de propósito: a imagem que vai para a VM não
 # leva ferramenta de teste junto. Mas as duas listas precisam existir — sem
 # esta, `tests/test_cabecalhos.py` não importa (`fastapi.testclient` é
-# construído sobre o `httpx`) e a suíte inteira falha na coleta, com uma
-# mensagem que fala de `httpx` e não do que está faltando.
+# construído sobre o cliente HTTP do Starlette) e a suíte inteira falha na
+# coleta, com uma mensagem que fala do cliente e não do que está faltando.
 -r requirements.txt
 
-# `TestClient` do Starlette/FastAPI roda em cima dele.
-httpx>=0.28.1
+# `TestClient` do Starlette/FastAPI roda sobre isto.
+#
+# Mudou de `httpx` para `httpx2`: o Starlette 1.6 (que o `fastapi>=0.141` puxa)
+# faz `import httpx2 as httpx` no `testclient.py` e só cai no `httpx` antigo se
+# o `httpx2` faltar. Com o pin antigo (`httpx>=0.28.1`) a coleta quebrava com
+# "requires the httpx2 package" — o runtime nem usa cliente HTTP, então isto
+# nunca aparecia fora dos testes. Se um dia o Starlette voltar ao `httpx`, é
+# aqui que troca de volta.
+httpx2>=2.12.0
 
 pytest>=9.1.1
