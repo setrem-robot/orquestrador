@@ -30,9 +30,31 @@ class TestTetoDeTempo(unittest.TestCase):
     def test_o_teto_vai_na_conexao(self):
         self.assertIn(f"statement_timeout={banco.TIMEOUT_CONSULTA_MS}", banco.CONNINFO)
 
-    def test_o_teto_vai_como_opcao_de_sessao(self):
-        """`options=-c ...` é o que o Postgres aplica ao abrir a sessão."""
-        self.assertIn("options=-c statement_timeout=", banco.CONNINFO)
+    def test_a_conninfo_e_valida_para_o_libpq(self):
+        """O teste que faltava — e que deixou passar um 503 em produção.
+
+        Afirmar que a string CONTÉM `options=-c statement_timeout=` não prova
+        nada: essa forma, sem aspas, é justamente a quebrada. O libpq quebra a
+        conninfo em espaços, então o valor `-c statement_timeout=8000` precisa
+        estar entre aspas — senão vira dois campos e o segundo é inválido.
+
+        `conninfo_to_dict` faz exatamente o parsing que o libpq faz. Se o campo
+        `options` não englobar o `-c statement_timeout`, ou se sobrar uma chave
+        solta `statement_timeout`, este teste falha — como falharia a conexão.
+        """
+        from psycopg.conninfo import conninfo_to_dict
+
+        partes = conninfo_to_dict(banco.CONNINFO)
+
+        self.assertNotIn(
+            "statement_timeout",
+            partes,
+            "o teto vazou como campo solto — a conexão inteira seria recusada",
+        )
+        self.assertEqual(
+            partes.get("options"),
+            f"-c statement_timeout={banco.TIMEOUT_CONSULTA_MS}",
+        )
 
     def test_o_cursor_nao_usa_mais_set_local(self):
         """`SET LOCAL` sozinho, em autocommit, não sobrevive ao próprio comando."""
