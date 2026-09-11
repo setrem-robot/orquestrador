@@ -32,8 +32,9 @@ comando de direção chega em `robo/comando/entrada` e para ali.
   (robô → banco); os dois últimos são o de volta, que faltava: um celular não
   fala Postgres, e abrir o banco para a internet para que ele falasse seria
   trocar um buraco por um bem maior.
-- **`site/`** — a landing page, HTML/CSS/JS puros, publicada pelo Cloudflare
-  Pages. Consome as rotas **públicas** da API (sem token, e servindo menos).
+- **`site/`** — apresentação na raiz e painel de consulta em `/painel/`, com
+  HTML/CSS/JS. O Caddy serve os arquivos e encaminha `/api/` à API. Somente o
+  painel consulta rotas **públicas**, sem token. Ver `site/README.md`.
 
 ## A API é só de leitura, e tem duas portas
 
