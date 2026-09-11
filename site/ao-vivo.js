@@ -25,6 +25,18 @@
     return 'Há ' + Math.floor(segundos / 86400) + ' dias';
   }
 
+  function tempoLigado(segundos) {
+    if (!Number.isFinite(segundos) || segundos < 0) return '—';
+    const d = Math.floor(segundos / 86400);
+    const h = Math.floor((segundos % 86400) / 3600);
+    const m = Math.floor((segundos % 3600) / 60);
+    if (d) return d + 'd ' + h + 'h';
+    if (h) return h + 'h ' + m + 'min';
+    return m + 'min';
+  }
+
+  const num = (v, casas = 0) => Number.isFinite(Number(v)) ? Number(v).toFixed(casas) : null;
+
   function idadeItem(item) {
     const timestamp = Date.parse(item.ultima);
     if (Number.isFinite(timestamp)) return (Date.now() - timestamp) / 1000;
@@ -150,6 +162,90 @@
       : 'Coordenadas fornecidas pelo serviço público';
   }
 
+  function saudeEstado(classe, texto) {
+    const alvo = el('saude-estado');
+    alvo.className = 'estado ' + classe;
+    alvo.textContent = texto;
+  }
+
+  function desenharSaude(resp) {
+    const d = resp && resp.dados;
+    if (!d || typeof d !== 'object') {
+      saudeEstado('parado', 'Sem leitura ainda');
+      el('s-temp').textContent = el('s-cpu').textContent = el('s-mem').textContent = el('s-uptime').textContent = '—';
+      el('s-nucleos').replaceChildren(Object.assign(document.createElement('li'), {className: 'sem-registro', textContent: 'Sem leitura de saúde disponível.'}));
+      el('s-atualizado').textContent = 'Aguardando leitura…';
+      return;
+    }
+    const cpu = d.cpu || {};
+    const mem = d.memoria || {};
+    const disco = d.disco || {};
+    const thr = d.throttled;
+
+    el('s-temp').textContent = num(d.temperatura_c, 1) !== null ? num(d.temperatura_c, 1) + ' °C' : '—';
+    const throttledOk = thr && thr.ok;
+    el('s-throttled').textContent = thr ? (throttledOk ? 'Energia e térmica OK' : 'Atenção: subtensão ou limite') : '—';
+    el('s-throttled').className = 'detalhe' + (thr && !throttledOk ? ' alerta' : '');
+
+    el('s-cpu').textContent = num(cpu.uso_pct) !== null ? num(cpu.uso_pct) + ' %' : '—';
+    el('s-freq').textContent = [
+      cpu.freq_mhz ? cpu.freq_mhz + ' MHz' : null,
+      cpu.governor || null,
+      num(cpu.voltagem_v, 2) !== null ? num(cpu.voltagem_v, 2) + ' V' : null,
+    ].filter(Boolean).join(' · ') || '—';
+
+    el('s-mem').textContent = num(mem.uso_pct) !== null ? num(mem.uso_pct) + ' %' : '—';
+    const detMem = [];
+    if (Number.isFinite(mem.disponivel_mb)) detMem.push(mem.disponivel_mb.toLocaleString('pt-BR') + ' MB livres');
+    if (Number.isFinite(mem.swap_usado_mb) && mem.swap_usado_mb > 0) detMem.push('swap ' + mem.swap_usado_mb + ' MB');
+    el('s-swap').textContent = detMem.join(' · ') || '—';
+
+    el('s-uptime').textContent = tempoLigado(d.uptime_s);
+    el('s-disco').textContent = num(disco.uso_pct) !== null
+      ? 'Disco ' + num(disco.uso_pct) + ' %' + (Number.isFinite(disco.livre_gb) ? ' · ' + disco.livre_gb + ' GB livres' : '')
+      : '';
+
+    const lista = el('s-nucleos');
+    lista.replaceChildren();
+    const nucleos = Array.isArray(cpu.por_nucleo) ? cpu.por_nucleo : [];
+    if (!nucleos.length) {
+      lista.append(Object.assign(document.createElement('li'), {className: 'sem-registro', textContent: 'Uso por núcleo aparece na próxima leitura.'}));
+    }
+    nucleos.forEach((valor, i) => {
+      const pct = Math.max(0, Math.min(100, Number(valor) || 0));
+      const li = document.createElement('li');
+      const nome = document.createElement('span');
+      nome.className = 'n-nome';
+      nome.textContent = 'Núcleo ' + i;
+      const barra = document.createElement('div');
+      barra.className = 'barra';
+      const preenche = document.createElement('i');
+      preenche.style.width = pct + '%';
+      if (pct >= 85) preenche.className = 'quente';
+      barra.append(preenche);
+      const val = document.createElement('span');
+      val.className = 'n-val';
+      val.textContent = Math.round(pct) + ' %';
+      li.append(nome, barra, val);
+      lista.append(li);
+    });
+
+    const rede = d.rede && typeof d.rede === 'object' ? d.rede : {};
+    const paresRede = Object.entries(rede);
+    el('s-rede').textContent = paresRede.length
+      ? 'Rede: ' + paresRede.map(([nome, v]) => nome + ' ↓' + v.rx_mb + ' ↑' + v.tx_mb + ' MB').join(' · ')
+      : 'Rede: —';
+
+    const ts = Date.parse(resp.ts);
+    const idadeS = Number.isFinite(ts) ? (Date.now() - ts) / 1000 : (typeof resp.idade_s === 'number' ? resp.idade_s : NaN);
+    el('s-atualizado').textContent = Number.isFinite(ts) ? 'Leitura ' + idade(idadeS).toLowerCase() : 'Horário indisponível';
+    if (!Number.isFinite(idadeS)) saudeEstado('parado', 'Leitura sem horário');
+    else if (idadeS < 0) saudeEstado('parado', 'Horário adiantado');
+    else if (!throttledOk && thr) saudeEstado('erro', 'Atenção na alimentação/temperatura');
+    else if (idadeS < 90) saudeEstado('vivo', 'Leitura recente');
+    else saudeEstado('parado', 'Sem leitura recente · ' + idade(idadeS).toLowerCase());
+  }
+
   async function atualizar() {
     if (consultando) return;
     consultando = true;
@@ -157,13 +253,17 @@
     if (resumoAtual) desenharResumo(resumoAtual);
     el('ultima-consulta').textContent = 'Consultando…';
     try {
-      const [resumo, trajeto] = await Promise.allSettled([
+      const [resumo, trajeto, saude] = await Promise.allSettled([
         buscar('/v1/publico/resumo').then(d => {
           if (!d || !Array.isArray(d.tipos)) throw new Error('Resumo inválido');
           return d;
         }),
         buscar('/v1/publico/trajeto?limite=300').then(d => {
           if (!d || !Array.isArray(d.pontos)) throw new Error('Trajeto inválido');
+          return d;
+        }),
+        buscar('/v1/publico/saude').then(d => {
+          if (!d || typeof d !== 'object') throw new Error('Saúde inválida');
           return d;
         }),
       ]);
@@ -184,6 +284,10 @@
         mapaVazio('Trajeto indisponível', 'Não foi possível consultar as posições. Tente novamente em instantes.');
         avisos.push('A consulta do trajeto não respondeu.');
       }
+      // A saúde do robô fala por si na própria seção; uma falha aqui não vira
+      // aviso global — o painel de contagens e trajeto continua legível.
+      if (saude.status === 'fulfilled') desenharSaude(saude.value);
+      else saudeEstado('erro', 'Não foi possível ler a saúde');
       el('aviso').textContent = avisos.join(' ');
       el('aviso').hidden = !avisos.length;
       el('ultima-consulta').textContent = ultimaConsulta

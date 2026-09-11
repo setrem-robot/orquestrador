@@ -225,3 +225,21 @@ def resumo() -> tuple[str, tuple]:
         ORDER BY tipo
     """
     return sql, ()
+
+
+def saude_sistema() -> tuple[str, tuple]:
+    """A última leitura de saúde do Pi (`tipo='sistema'`).
+
+    É seguro servir sem token: temperatura, CPU, memória, disco e rede não
+    dizem onde o robô está nem carregam segredo — ao contrário do GPS. Uma
+    busca por índice `(tipo, ts DESC)` com `LIMIT 1`, então é barata mesmo
+    aberta ao público.
+    """
+    sql = """
+        SELECT ts, payload
+        FROM telemetria
+        WHERE tipo = 'sistema'
+        ORDER BY ts DESC
+        LIMIT 1
+    """
+    return sql, ()

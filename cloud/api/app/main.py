@@ -316,6 +316,28 @@ async def trajeto_publico(limite: int | None = Query(default=200, ge=1, le=500))
     return {"pontos": pontos, "total": len(pontos), "precisao_casas": seguranca.PRECISAO_GPS_PUBLICA}
 
 
+@app.get("/v1/publico/saude", tags=["público"], dependencies=[Depends(porta_publica)])
+async def saude_publica() -> dict:
+    """A saúde do Pi mais recente — temperatura, CPU, memória, disco, rede.
+
+    Servida sem token porque nada aqui diz onde o robô está nem é segredo (ao
+    contrário do trajeto). Vem com `idade_s` calculado: sem ele a tela mostraria
+    "45 °C" com a mesma cara para um dado de agora e para um de ontem — o mesmo
+    cuidado de `/v1/estado`. Sem nenhuma leitura ainda, `dados` é `null`.
+    """
+    linhas = banco.consultar(*consultas.saude_sistema())
+    agora = consultas.agora()
+    if not linhas:
+        return {"gerado_em": _iso(agora), "ts": None, "idade_s": None, "dados": None}
+    ts, payload = linhas[0]
+    return {
+        "gerado_em": _iso(agora),
+        "ts": _iso(ts),
+        "idade_s": round((agora - ts).total_seconds(), 1),
+        "dados": payload,
+    }
+
+
 # ---------------------------------------------------------------------------
 def _iso(momento: datetime | None) -> str | None:
     """Instante em ISO 8601 com fuso — o formato que `DateTime.parse` do Dart lê."""

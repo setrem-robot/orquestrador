@@ -27,6 +27,20 @@
       <li class="metrica"><span class="rotulo">Registros de motores</span><strong class="valor" id="motores">—</strong><span class="detalhe">Estados recebidos</span></li>
       <li class="metrica"><span class="rotulo">Fontes de dados</span><strong class="valor" id="fontes">—</strong><span class="detalhe">Com registros disponíveis</span></li>
     </ul>
+    <section class="bloco bloco-saude" aria-labelledby="saude-titulo" id="saude">
+      <div class="bloco-titulo saude-cabecalho">
+        <div><h2 id="saude-titulo">Saúde do robô</h2><p>Estado do Raspberry Pi na última leitura enviada.</p></div>
+        <span id="saude-estado" class="estado" role="status" aria-live="polite">Consultando…</span>
+      </div>
+      <ul class="metricas metricas-saude" aria-label="Saúde do Raspberry Pi">
+        <li class="metrica"><span class="rotulo">Temperatura</span><strong class="valor" id="s-temp">—</strong><span class="detalhe" id="s-throttled">—</span></li>
+        <li class="metrica"><span class="rotulo">Processador</span><strong class="valor" id="s-cpu">—</strong><span class="detalhe" id="s-freq">—</span></li>
+        <li class="metrica"><span class="rotulo">Memória</span><strong class="valor" id="s-mem">—</strong><span class="detalhe" id="s-swap">—</span></li>
+        <li class="metrica"><span class="rotulo">Tempo ligado</span><strong class="valor" id="s-uptime">—</strong><span class="detalhe" id="s-disco">—</span></li>
+      </ul>
+      <div class="nucleos"><span class="rotulo-bloco">Consumo por núcleo</span><ul id="s-nucleos" class="lista-nucleos"><li class="sem-registro">Aguardando leitura…</li></ul></div>
+      <div class="bloco-rodape saude-rodape"><span id="s-rede">Rede: —</span><span id="s-atualizado">Aguardando leitura…</span></div>
+    </section>
     <div class="painel-grid">
       <section class="bloco" aria-labelledby="trajeto-titulo">
         <div class="bloco-titulo"><h2 id="trajeto-titulo">Trajeto recente</h2><p>Posições públicas registradas nas últimas 24 horas.</p></div>
