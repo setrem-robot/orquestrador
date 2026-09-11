@@ -83,10 +83,12 @@ def parse_loadavg(raw: str) -> dict | None:
 
 
 def parse_meminfo(raw: str) -> dict | None:
-    """`/proc/meminfo` -> memória em MB e porcentagem em uso.
+    """`/proc/meminfo` -> memória e swap em MB e porcentagem em uso.
 
     Usa `MemAvailable` (o que dá para usar de fato, contando cache liberável),
     não `MemFree` — `MemFree` num Linux saudável é sempre baixo e assusta à toa.
+    O swap entra junto: num Pi que enche a RAM, é o swap subindo que antecede a
+    lentidão, e ele mora no mesmo arquivo.
     """
     campos: dict[str, int] = {}
     for linha in raw.splitlines():
@@ -101,11 +103,84 @@ def parse_meminfo(raw: str) -> dict | None:
     if not total or disponivel is None:
         return None
     usado = total - disponivel
-    return {
+    resultado = {
         "total_mb": round(total / 1024),
         "disponivel_mb": round(disponivel / 1024),
         "uso_pct": round(usado / total * 100, 1),
     }
+    swap_total = campos.get("SwapTotal")
+    swap_livre = campos.get("SwapFree")
+    if swap_total is not None and swap_livre is not None:
+        resultado["swap_total_mb"] = round(swap_total / 1024)
+        resultado["swap_usado_mb"] = round((swap_total - swap_livre) / 1024)
+    return resultado
+
+
+def parse_processos(raw_loadavg: str) -> dict | None:
+    """Do 4º campo do `/proc/loadavg` (ex.: "1/234") -> rodando e total.
+
+    O `/proc/loadavg` termina com "rodando/total" de tarefas escalonáveis. É o
+    jeito mais barato de saber quantos processos existem e quantos disputam a
+    CPU agora, sem varrer o `/proc` inteiro.
+    """
+    partes = raw_loadavg.split()
+    if len(partes) < 4 or "/" not in partes[3]:
+        return None
+    rodando, _, total = partes[3].partition("/")
+    if not (rodando.isdigit() and total.isdigit()):
+        return None
+    return {"rodando": int(rodando), "total": int(total)}
+
+
+def parse_freq_khz(raw: str) -> int | None:
+    """`scaling_cur_freq` (kHz) -> MHz inteiro. "1500000\\n" -> 1500."""
+    raw = raw.strip()
+    if not raw.isdigit():
+        return None
+    return round(int(raw) / 1000)
+
+
+def parse_volts(raw: str) -> float | None:
+    """`vcgencmd measure_volts` -> volts. "volt=0.8563V" -> 0.856."""
+    raw = raw.strip()
+    if "=" in raw:
+        raw = raw.split("=", 1)[1]
+    raw = raw.strip().rstrip("Vv")
+    try:
+        return round(float(raw), 3)
+    except ValueError:
+        return None
+
+
+def parse_rede(raw: str, ignorar: tuple[str, ...] = ("lo",)) -> dict | None:
+    """`/proc/net/dev` -> bytes recebidos/enviados por interface, em MB.
+
+    São contadores acumulados desde o boot (não taxa): servem para ver quanto o
+    robô trafegou e qual interface está em uso. A `lo` (loopback) fica de fora
+    porque não diz nada sobre a rede de verdade. Sem nenhuma interface -> None.
+    """
+    interfaces: dict[str, dict] = {}
+    for linha in raw.splitlines():
+        if ":" not in linha:
+            continue
+        nome, _, resto = linha.partition(":")
+        nome = nome.strip()
+        if nome in ignorar:
+            continue
+        campos = resto.split()
+        # Layout do /proc/net/dev: recebidos[0]=bytes ... enviados[8]=bytes.
+        if len(campos) < 9:
+            continue
+        try:
+            rx = int(campos[0])
+            tx = int(campos[8])
+        except ValueError:
+            continue
+        interfaces[nome] = {
+            "rx_mb": round(rx / 1024**2, 1),
+            "tx_mb": round(tx / 1024**2, 1),
+        }
+    return interfaces or None
 
 
 def parse_uptime(raw: str) -> float | None:
@@ -152,15 +227,14 @@ def cpu_uso_pct(anterior: tuple[int, int], atual: tuple[int, int]) -> float | No
     return round(max(0.0, min(100.0, d_ocupado / d_total * 100)), 1)
 
 
-def total_e_ocupado_do_proc_stat(raw: str) -> tuple[int, int] | None:
-    """Primeira linha de `/proc/stat` -> (ocupado, total) em jiffies.
+def _ocupado_total_de_linha(linha: str) -> tuple[int, int] | None:
+    """Uma linha "cpu..." do `/proc/stat` -> (ocupado, total) em jiffies.
 
-    "cpu  123 4 56 789 10 0 2 0 0 0" — os campos são user, nice, system, idle,
-    iowait, irq, softirq, steal... O "ocupado" é tudo menos idle+iowait.
+    Os campos são user, nice, system, idle, iowait, irq, softirq, steal... O
+    "ocupado" é tudo menos idle+iowait.
     """
-    primeira = raw.splitlines()[0] if raw.strip() else ""
-    partes = primeira.split()
-    if len(partes) < 5 or partes[0] != "cpu":
+    partes = linha.split()
+    if len(partes) < 5 or not partes[0].startswith("cpu"):
         return None
     try:
         numeros = [int(x) for x in partes[1:]]
@@ -169,6 +243,37 @@ def total_e_ocupado_do_proc_stat(raw: str) -> tuple[int, int] | None:
     total = sum(numeros)
     idle = numeros[3] + (numeros[4] if len(numeros) > 4 else 0)  # idle + iowait
     return total - idle, total
+
+
+def total_e_ocupado_do_proc_stat(raw: str) -> tuple[int, int] | None:
+    """Primeira linha de `/proc/stat` -> (ocupado, total) agregado em jiffies.
+
+    "cpu  123 4 56 789 10 0 2 0 0 0" — a linha "cpu" (sem número) soma todos os
+    núcleos. É o uso total do processador.
+    """
+    primeira = raw.splitlines()[0] if raw.strip() else ""
+    if primeira.split()[:1] != ["cpu"]:
+        return None
+    return _ocupado_total_de_linha(primeira)
+
+
+def nucleos_do_proc_stat(raw: str) -> dict[str, tuple[int, int]]:
+    """`/proc/stat` -> {"cpu": (ocup,tot), "cpu0": (...), "cpu1": (...), ...}.
+
+    A linha "cpu" é o agregado; "cpu0", "cpu1"... são os núcleos. Devolver tudo
+    de uma vez deixa o `main` guardar uma leitura só e derivar o uso agregado E
+    o de cada núcleo (o "consumo por thread") do mesmo delta. Linhas que não
+    começam com "cpu" (intr, ctxt...) são ignoradas.
+    """
+    leituras: dict[str, tuple[int, int]] = {}
+    for linha in raw.splitlines():
+        chave = linha.split()[:1]
+        if not chave or not chave[0].startswith("cpu"):
+            continue
+        ot = _ocupado_total_de_linha(linha)
+        if ot is not None:
+            leituras[chave[0]] = ot
+    return leituras
 
 
 def parse_wireless(raw: str, interface: str = "wlan0") -> dict | None:
