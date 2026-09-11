@@ -1,0 +1,30 @@
+# Copie para /etc/systemd/system/robo-telemetria.service e ajuste User e caminhos.
+#
+#   sudo cp pi/systemd/robo-telemetria.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now robo-telemetria
+#   journalctl -u robo-telemetria -f
+#
+# Publica a saúde do Pi em robo/telemetria/sistema. Não precisa de hardware
+# nenhum: lê /proc e chama vcgencmd. É o serviço que faz a telemetria do robô
+# existir mesmo antes de GPS e motores estarem montados.
+
+[Unit]
+Description=Robo PIE V - Telemetria de saude do Raspberry Pi -> MQTT
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=setrem
+WorkingDirectory=/home/setrem/setrem-robot/pi
+ExecStart=/home/setrem/setrem-robot/pi/.venv/bin/telemetria
+Environment=MQTT_HOST=127.0.0.1
+Environment=MQTT_PORT=1883
+Environment=TELEMETRIA_INTERVALO_S=30
+Environment=TELEMETRIA_WIFI_IFACE=wlan0
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -42,7 +42,7 @@ VENV="$PI_ROOT/.venv"
 SYSTEMD_DIR="$PI_ROOT/systemd"
 
 # Serviços a instalar (pastas em pi/services/). Acrescente novos serviços aqui.
-SERVICOS=(serial_ingestor orquestrador gps wifi motores)
+SERVICOS=(serial_ingestor orquestrador gps wifi motores telemetria)
 
 # Mapa serviço → nome do arquivo .service (sem extensão).
 declare -A SYSTEMD_SERVICES=(
@@ -51,6 +51,9 @@ declare -A SYSTEMD_SERVICES=(
     [gps]="robo-gps"
     [wifi]="robo-wifi"
     [motores]="robo-motores"
+    # Saúde do próprio Pi. Sem hardware: só lê /proc e chama vcgencmd, então
+    # sobe em qualquer Pi mesmo sem GPS, motores ou ESP32 ligados.
+    [telemetria]="robo-telemetria"
 )
 
 echo ">> Criando virtualenv compartilhado em $VENV"

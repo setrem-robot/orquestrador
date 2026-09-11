@@ -1,0 +1,19 @@
+[project]
+name = "telemetria"
+version = "0.1.0"
+description = "Publica a saúde do próprio Raspberry Pi (temperatura, throttled, CPU, memória, disco, Wi-Fi) no broker MQTT local do robô."
+requires-python = ">=3.11"
+dependencies = [
+    # Só stdlib para ler /proc e chamar vcgencmd — a lib compartilhada dá o MQTT.
+    "robo-common",
+]
+
+[project.scripts]
+telemetria = "telemetria.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
