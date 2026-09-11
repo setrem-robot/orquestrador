@@ -19,10 +19,9 @@
 #   2. a API fala com qualquer origem (CORS) e loga em DEBUG;
 #   3. sem `cloudflared` — não há domínio apontando para cá.
 #
-# A quarta diferença — a API escutando na rede local, para o celular alcançar —
-# não está aqui: ela é `API_BIND=0.0.0.0` no `.env`. Listas de `ports` são
-# CONCATENADAS quando dois arquivos de compose são combinados, então redeclarar
-# a porta faria o Docker tentar abri-la duas vezes.
+# A quarta diferença — a porta de entrada (o Caddy) escutando na rede local,
+# para o celular alcançar — não está aqui: é `CADDY_BIND=0.0.0.0` no `.env`.
+# O app aponta para `http://<ip>:8088/api`, o mesmo `/api` que vale na VM.
 #
 # Migrar para o LARCC é parar de passar este arquivo. Nada mais muda.
 #
@@ -48,10 +47,9 @@ services:
       MQTT_PASSWORD: ""
 
   api:
-    # A porta NÃO é redeclarada aqui: listas de `ports` são concatenadas entre
-    # arquivos de compose, e repetir a 8000 faria o Docker tentar abri-la duas
-    # vezes ("address already in use"). Quem muda o endereço de escuta é
-    # `API_BIND=0.0.0.0` no `.env` — ver `.env.local.example`.
+    # A API não publica porta em lugar nenhum: quem fica na frente é o Caddy, e
+    # é ele que o celular alcança (`CADDY_BIND=0.0.0.0` no `.env`). Aqui só
+    # mudam CORS e log — ver `.env.local.example`.
     environment:
       # `*` porque em desenvolvimento a landing page é servida de onde der na
       # hora — `python -m http.server`, `file://`, outra porta. Na VM isto é o
