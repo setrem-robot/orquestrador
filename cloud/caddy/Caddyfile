@@ -10,6 +10,11 @@
 		reverse_proxy api:8000
 	}
 	handle {
-		respond "Atlas: a API esta em /api (ex.: /api/saude)" 200
+		root * /srv/atlas
+		encode zstd gzip
+		header Cache-Control "no-cache"
+		file_server {
+			hide *.md
+		}
 	}
 }

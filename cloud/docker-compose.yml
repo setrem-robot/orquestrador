@@ -133,6 +133,7 @@ services:
       - "${CADDY_BIND:-127.0.0.1}:${CADDY_PORT:-8088}:80"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../site:/srv/atlas:ro
       - caddy_data:/data
       - caddy_config:/config
 

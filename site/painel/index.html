@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090f15">
+  <title>Painel Atlas — telemetria e trajeto</title>
+  <meta name="description" content="Acompanhe os registros públicos da Atlas, o trajeto disponível e a atualização de cada fonte de telemetria.">
+  <link rel="icon" href="../assets/atlas.png" type="image/png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para os dados</a>
+  <header class="topo"><div class="faixa">
+    <a class="marca" href="../" aria-label="Atlas, apresentação do projeto"><img src="../assets/atlas.png" alt="" width="38" height="38">atlas<span class="marca-nota">/ PAINEL</span></a>
+    <nav aria-label="Navegação principal"><a href="../">O projeto</a><a class="nav-painel" href="./" aria-current="page">Visão geral</a></nav>
+  </div></header>
+  <main id="conteudo" class="faixa painel-app">
+    <div class="painel-cabecalho"><div><p class="sobrelinha">TELEMETRIA PÚBLICA</p><h1>Acompanhe a Atlas</h1><p>Registros recebidos, últimas atualizações e trajeto disponível.</p></div><button type="button" id="atualizar" class="botao">Atualizar dados <span aria-hidden="true">↻</span></button></div>
+    <div class="barra-estado"><p id="estado-conexao" class="estado" role="status" aria-live="polite">Consultando informações…</p><p id="ultima-consulta" class="meta">Atualização automática a cada 30 segundos</p></div>
+    <noscript><p class="aviso">Ative o JavaScript para consultar a telemetria. A <a href="../">apresentação do projeto</a> continua disponível.</p></noscript>
+    <p id="aviso" class="aviso" role="status" hidden></p>
+    <ul class="metricas" aria-label="Resumo da telemetria">
+      <li class="metrica"><span class="rotulo">Registros recebidos</span><strong class="valor" id="total">—</strong><span class="detalhe">No histórico disponível</span></li>
+      <li class="metrica"><span class="rotulo">Posições de GPS</span><strong class="valor" id="gps">—</strong><span class="detalhe">Leituras no histórico</span></li>
+      <li class="metrica"><span class="rotulo">Registros de motores</span><strong class="valor" id="motores">—</strong><span class="detalhe">Estados recebidos</span></li>
+      <li class="metrica"><span class="rotulo">Fontes de dados</span><strong class="valor" id="fontes">—</strong><span class="detalhe">Com registros disponíveis</span></li>
+    </ul>
+    <div class="painel-grid">
+      <section class="bloco" aria-labelledby="trajeto-titulo">
+        <div class="bloco-titulo"><h2 id="trajeto-titulo">Trajeto recente</h2><p>Posições públicas registradas nas últimas 24 horas.</p></div>
+        <div id="mapa" class="mapa" aria-label="Mapa do trajeto registrado" hidden></div>
+        <div id="mapa-vazio" class="mapa-vazio"><div><strong id="mapa-vazio-titulo">Buscando posições</strong><p id="mapa-vazio-texto">O trajeto aparece quando há registros disponíveis.</p></div></div>
+        <div class="bloco-rodape legenda-mapa"><span id="pontos-mapa">Aguardando GPS</span><span id="precisao-mapa">Posição com precisão reduzida</span></div>
+      </section>
+      <section class="bloco" aria-labelledby="sinais-titulo"><div class="bloco-titulo"><h2 id="sinais-titulo">Últimas atualizações</h2><p>Quando cada fonte enviou seu último registro.</p></div><ul id="sinais" class="lista-sinais"><li class="sem-registro">Consultando registros…</li></ul><div class="bloco-rodape">Horários no fuso do seu dispositivo.</div></section>
+    </div>
+    <p class="painel-nota">As contagens representam registros no histórico, não valores atuais dos sensores. Uma resposta do servidor não significa que o robô está online.</p>
+  </main>
+  <footer class="faixa rodape"><p>Atlas · Engenharia de Computação · SETREM</p><a href="../">Conhecer o projeto <span aria-hidden="true">↗</span></a></footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="../config.js" defer></script>
+  <script src="../ao-vivo.js" defer></script>
+</body>
+</html>
