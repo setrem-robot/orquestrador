@@ -242,3 +242,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Credenciais do túnel Cloudflare (o config.yml é versionado; estas não).
+cloud/cloudflared/*.json
+cloud/cloudflared/cert.pem

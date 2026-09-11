@@ -228,52 +228,67 @@ Assim a VM **não precisa de IP público nem de porta aberta no firewall do
 LARCC**: o túnel abre a conexão de dentro para fora, e a Cloudflare passa a
 entregar as requisições por ela. O HTTPS válido vem junto e renovado.
 
-1. No painel: **Zero Trust → Networks → Tunnels → Create a tunnel →
-   Cloudflared**. Dê um nome (`atlas-api`).
-2. Copie o token que ele mostra para `TUNNEL_TOKEN` no `.env`.
-3. Ainda no painel, em **Public Hostnames**, aponte
-   `api.seudominio.com.br` → `http://api:8000`.
-   O nome `api` é o do serviço no compose: os dois containers estão na mesma
-   rede do Docker, então o túnel o alcança sem passar pela rede da VM.
-4. Suba:
+**O desenho aqui é por arquivo, não por token de painel.** A rota do domínio
+mora em `cloudflared/config.yml` (versionado), e o túnel entra em
+`atlas.kerlonr.com.br` inteiro → **`http://caddy:80`**. Quem separa a API da
+landing page é o Caddy, não o painel: ele corta o prefixo `/api` e repassa à
+API (a raiz do domínio fica livre para o site). Assim a rota é revisável no
+Git, e a URL do app é sempre `https://SEU_DOMINIO/api`.
+
+As credenciais do túnel (um `.json` e o `cert.pem`) ficam em `cloudflared/`,
+**fora do git**. Cria-se uma vez, na máquina que tiver um navegador:
+
+```bash
+# Autoriza a zona (abre o navegador). Numa VM headless, rode isto no seu PC
+# e copie o cert.pem gerado para ~/.cloudflared/ da VM.
+cloudflared tunnel login
+
+# Cria o túnel (gera o <uuid>.json) e aponta o DNS para ele.
+cloudflared tunnel create atlas-api
+cloudflared tunnel route dns atlas-api atlas.kerlonr.com.br
+```
+
+Depois, ponha o `<uuid>.json`, o `cert.pem` e ajuste o `tunnel:`/
+`credentials-file:` do `cloudflared/config.yml` com esse UUID. As credenciais
+precisam ser legíveis pelo usuário do container (`chmod 644 cloudflared/*.json
+cloudflared/cert.pem`). Então:
 
 ```bash
 docker compose --profile tunel up -d
-curl https://api.seudominio.com.br/saude
+curl https://atlas.kerlonr.com.br/api/saude
 ```
+
+Tudo num comando: `mosquitto`, `timescaledb`, `ingestor`, `api`, `caddy` e o
+`cloudflared`. Sem o perfil `tunel`, os cinco primeiros sobem e o túnel não —
+que é o modo de rodar localmente.
+
+### Se der erro 1033 (nenhum túnel atende)
+
+O hostname existe no DNS mas nenhum conector o serve. Confira que o
+`cloudflared` subiu e registrou conexões:
+
+```bash
+docker compose logs cloudflared | grep -c 'Registered tunnel connection'   # espera 4
+```
+
+Zero: veja se ele leu as credenciais (`permission denied` no log = arquivo sem
+leitura para o usuário do container; `chmod 644`). Se o DNS aponta para outro
+túnel, refaça o `route dns` com `--overwrite-dns`.
 
 ### Se der 502
 
-Duas causas, e a diferença entre elas está em **quem atende**.
-
-**O hostname aponta para `localhost:8000`.** Dentro do container do conector,
-`localhost` é ele mesmo, e ali não há nada escutando. É o padrão que o painel
-sugere, e o único certo aqui é `api:8000`. Confira no log do próprio conector,
-que imprime a configuração que recebeu:
+O `config.yml` aponta o serviço errado. Dentro da rede do compose o Caddy é
+`caddy:80` (nome do serviço), nunca `localhost`. Confira o `ingress:` do
+`cloudflared/config.yml` e o log do Caddy:
 
 ```bash
-docker compose logs cloudflared | grep 'Updated to new configuration'
+docker compose logs caddy | tail
 ```
 
-**Há mais de um conector no mesmo túnel.** Todos recebem a *mesma*
-configuração, e a Cloudflare reparte o tráfego entre eles — então um conector
-fora da rede do compose (instalado no Raspberry Pi, ou por
-`cloudflared service install` numa máquina qualquer) não resolve o nome `api` e
-devolve 502 na fatia dele. O sintoma engana: funciona de forma intermitente, o
-que parece instabilidade de rede.
-
-Para saber se é isso, peça o `/saude` algumas vezes e veja se **todas** as
-requisições aparecem no log da API:
-
-```bash
-for i in 1 2 3 4 5; do curl -s -o /dev/null "https://api.seudominio.com.br/saude?n=$i"; done
-docker compose logs --since 1m api | grep -c 'saude?n='
-```
-
-Menos de cinco, há outro conector. Apague os que sobram em **Tunnels → o túnel
-→ Connectors**, guardando o do compose — o ID dele sai em
-`docker compose logs cloudflared | grep 'Generated Connector ID'`, e muda a
-cada vez que o container sobe.
+**Mais de um conector no mesmo túnel** também reparte o tráfego e dá 502
+intermitente na fatia de quem não alcança o Caddy. Rode o teste algumas vezes
+e veja se todas as requisições chegam ao Caddy; se faltar, apague os conectores
+extras em **Tunnels → o túnel → Connectors**.
 
 ## 5. As rotas
 

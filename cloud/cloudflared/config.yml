@@ -1,0 +1,15 @@
+# Túnel nomeado do atlas.kerlonr.com.br -> Caddy (que corta o /api).
+#
+# Isto é versionado de propósito: a rota do domínio mora no repositório, não
+# numa tela do painel. O que NÃO entra no git são as credenciais — o `.json`
+# do túnel e o `cert.pem` — que ficam nesta mesma pasta (ver .gitignore) e são
+# criados uma vez com `cloudflared tunnel login` + `cloudflared tunnel create`.
+#
+# O UUID e o hostname não são segredo; a credencial é.
+tunnel: 30bd9c0b-617b-4e6c-8486-ffe3c54c59a6
+credentials-file: /etc/cloudflared/30bd9c0b-617b-4e6c-8486-ffe3c54c59a6.json
+
+ingress:
+  - hostname: atlas.kerlonr.com.br
+    service: http://caddy:80
+  - service: http_status:404

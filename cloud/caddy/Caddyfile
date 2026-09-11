@@ -1,0 +1,15 @@
+# Porta de entrada HTTP do Atlas. Só corta caminho e repassa — não termina TLS
+# (quem faz HTTPS é o túnel da Cloudflare, na frente).
+#
+# O `/api` existe para a raiz do domínio (atlas.kerlonr.com.br) ficar livre
+# para a landing page, com a API embaixo de `/api`. O Cloudflare entrega o
+# caminho inteiro, com o `/api`; `handle_path` remove esse prefixo antes de
+# repassar, então a API continua recebendo `/saude` e `/v1/...` como sempre.
+:80 {
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		respond "Atlas: a API esta em /api (ex.: /api/saude)" 200
+	}
+}
