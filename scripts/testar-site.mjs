@@ -7,7 +7,7 @@ import vm from 'node:vm';
 
 const site = resolve(dirname(fileURLToPath(import.meta.url)), '../site');
 const script = readFileSync(resolve(site, 'ao-vivo.js'), 'utf8');
-const paginas = ['index.html', 'painel/index.html'];
+const paginas = ['index.html', 'painel/index.html', 'completo/index.html'];
 for (const pagina of paginas) {
   const html = readFileSync(resolve(site, pagina), 'utf8');
   for (const [, valor] of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
