@@ -9,7 +9,7 @@ import argparse
 
 SITE = Path(__file__).resolve().parents[1] / "site"
 ORIGEM = "https://atlas.kerlonr.com.br"
-PUBLICAS = {"/api/v1/publico/resumo", "/api/v1/publico/trajeto"}
+PUBLICAS = {"/api/v1/publico/resumo", "/api/v1/publico/trajeto", "/api/v1/publico/saude"}
 
 
 class Handler(SimpleHTTPRequestHandler):
