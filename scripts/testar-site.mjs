@@ -17,7 +17,7 @@ for (const pagina of paginas) {
 }
 
 class Elemento {
-  constructor() {this.children = []; this.hidden = false; this.textContent = ''; this.events = {};}
+  constructor() {this.children = []; this.hidden = false; this.textContent = ''; this.events = {}; this.style = {};}
   append(...itens) {this.children.push(...itens);}
   replaceChildren(...itens) {this.children = itens;}
   addEventListener(nome, callback) {this.events[nome] = callback;}
@@ -29,7 +29,7 @@ function ambiente() {
     if (!elementos.has(id)) elementos.set(id, new Elemento());
     return elementos.get(id);
   };
-  const resposta = {resumo: {tipos: []}, trajeto: {pontos: []}};
+  const resposta = {resumo: {tipos: []}, trajeto: {pontos: []}, saude: {dados: null}};
   const eventos = {};
   let chamadas = 0;
   const document = {
@@ -43,7 +43,9 @@ function ambiente() {
     fetch: async url => {
       chamadas++;
       assert.ok(url.startsWith('/api/v1/publico/'), 'Apenas rotas públicas');
-      const body = url.includes('resumo') ? resposta.resumo : resposta.trajeto;
+      const body = url.includes('resumo') ? resposta.resumo
+        : url.includes('saude') ? resposta.saude
+        : resposta.trajeto;
       if (body instanceof Error) throw body;
       return {ok: true, json: async () => body};
     },
@@ -95,6 +97,22 @@ await a.get('atualizar').events.click();
 assert.equal(a.get('mapa').hidden, true);
 assert.equal(removido, 1, 'Remover a posição anterior quando o período fica vazio');
 
+a.resposta.saude = {ts: new Date().toISOString(), idade_s: 4, dados: {
+  temperatura_c: 66.5, throttled: {ok: true},
+  cpu: {uso_pct: 12.3, freq_mhz: 2400, governor: 'ondemand', voltagem_v: 0.887, por_nucleo: [10, 20, 30, 40]},
+  memoria: {uso_pct: 55, disponivel_mb: 3600, swap_total_mb: 2048, swap_usado_mb: 0},
+  disco: {uso_pct: 42, livre_gb: 16.6}, uptime_s: 7200, rede: {eth0: {rx_mb: 1.1, tx_mb: 0.4}},
+}};
+await a.get('atualizar').events.click();
+assert.match(a.get('s-temp').textContent, /66\.5/);
+assert.match(a.get('s-cpu').textContent, /12/);
+assert.match(a.get('saude-estado').className, /vivo/);
+assert.equal(a.get('s-nucleos').children.length, 4, 'Uma barra por núcleo');
+
+a.resposta.saude = {ts: new Date().toISOString(), dados: {temperatura_c: 80, throttled: {ok: false}, cpu: {}, memoria: {}, disco: {}}};
+await a.get('atualizar').events.click();
+assert.match(a.get('saude-estado').className, /erro/, 'Subtensão/limite vira alerta');
+
 const antes = a.chamadas();
 a.document.hidden = true;
 a.eventos.intervalo();
@@ -103,11 +121,11 @@ a.document.hidden = false;
 const um = a.get('atualizar').events.click();
 const dois = a.get('atualizar').events.click();
 await Promise.all([um, dois]);
-assert.equal(a.chamadas(), antes + 2, 'Não sobrepor consultas');
+assert.equal(a.chamadas(), antes + 3, 'Não sobrepor consultas (resumo, trajeto e saúde)');
 
 a.resposta.resumo = {outro: []};
 await a.get('atualizar').events.click();
 assert.match(a.get('estado-conexao').className, /erro/);
 assert.equal(a.get('atualizar').disabled, false);
 
-console.log('OK: referências locais, vazio, dado antigo, falha parcial, recuperação, mapa indisponível, limpeza do mapa, aba oculta, concorrência e contrato inválido.');
+console.log('OK: referências locais, vazio, dado antigo, falha parcial, recuperação, mapa indisponível, limpeza do mapa, saúde do robô, alerta de subtensão, aba oculta, concorrência e contrato inválido.');

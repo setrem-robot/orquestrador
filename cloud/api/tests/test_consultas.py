@@ -116,5 +116,16 @@ class TestEventos(unittest.TestCase):
         self.assertNotIn("OFFSET", sql)
 
 
+class TestSaudeSistema(unittest.TestCase):
+    def test_pega_a_ultima_do_tipo_sistema(self):
+        sql, parametros = consultas.saude_sistema()
+        # Sem parâmetro: o tipo é fixo (só existe um "sistema"), então vai
+        # literal no SQL — e uma varredura de índice com LIMIT 1.
+        self.assertEqual(parametros, ())
+        self.assertIn("tipo = 'sistema'", sql)
+        self.assertIn("ORDER BY ts DESC", sql)
+        self.assertIn("LIMIT 1", sql)
+
+
 if __name__ == "__main__":
     unittest.main()
