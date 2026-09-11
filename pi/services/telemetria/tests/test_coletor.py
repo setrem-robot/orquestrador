@@ -70,9 +70,72 @@ class TestMemoria(unittest.TestCase):
         self.assertEqual(r["uso_pct"], 25.0)
         self.assertEqual(r["total_mb"], round(8000000 / 1024))
         self.assertEqual(r["disponivel_mb"], round(6000000 / 1024))
+        # sem linhas de swap, o bloco não inventa os campos
+        self.assertNotIn("swap_total_mb", r)
+
+    def test_swap_quando_presente(self):
+        raw = (
+            "MemTotal:  8000000 kB\nMemAvailable: 6000000 kB\n"
+            "SwapTotal: 2000000 kB\nSwapFree:  1500000 kB\n"
+        )
+        r = coletor.parse_meminfo(raw)
+        self.assertEqual(r["swap_total_mb"], round(2000000 / 1024))
+        # usado = total - livre = 500000 kB
+        self.assertEqual(r["swap_usado_mb"], round(500000 / 1024))
 
     def test_sem_os_campos_vira_none(self):
         self.assertIsNone(coletor.parse_meminfo("Foo: 1 kB\n"))
+
+
+class TestProcessos(unittest.TestCase):
+    def test_rodando_e_total(self):
+        self.assertEqual(
+            coletor.parse_processos("0.52 0.41 0.38 2/234 5678"),
+            {"rodando": 2, "total": 234},
+        )
+
+    def test_sem_o_campo_vira_none(self):
+        self.assertIsNone(coletor.parse_processos("0.5 0.4 0.3"))
+
+
+class TestFrequenciaEVoltagem(unittest.TestCase):
+    def test_khz_vira_mhz(self):
+        self.assertEqual(coletor.parse_freq_khz("1500000\n"), 1500)
+
+    def test_freq_lixo_vira_none(self):
+        self.assertIsNone(coletor.parse_freq_khz(""))
+        self.assertIsNone(coletor.parse_freq_khz("N/A"))
+
+    def test_volts(self):
+        self.assertEqual(coletor.parse_volts("volt=0.8563V"), 0.856)
+
+    def test_volts_lixo_vira_none(self):
+        self.assertIsNone(coletor.parse_volts(""))
+        self.assertIsNone(coletor.parse_volts("volt=xV"))
+
+
+class TestRede(unittest.TestCase):
+    RAW = (
+        "Inter-|   Receive                    |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast|"
+        "bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:  1000      10    0    0    0     0          0         0    "
+        "1000      10    0    0    0     0       0          0\n"
+        "  eth0: 2097152   500    0    0    0     0          0         0   "
+        "1048576   400    0    0    0     0       0          0\n"
+    )
+
+    def test_bytes_por_interface_em_mb(self):
+        r = coletor.parse_rede(self.RAW)
+        self.assertIn("eth0", r)
+        self.assertEqual(r["eth0"]["rx_mb"], 2.0)  # 2 MiB
+        self.assertEqual(r["eth0"]["tx_mb"], 1.0)  # 1 MiB
+
+    def test_loopback_fora(self):
+        self.assertNotIn("lo", coletor.parse_rede(self.RAW))
+
+    def test_sem_interface_vira_none(self):
+        self.assertIsNone(coletor.parse_rede("cabecalho\nsem dois pontos\n"))
 
 
 class TestUptime(unittest.TestCase):
@@ -115,6 +178,21 @@ class TestCpu(unittest.TestCase):
 
     def test_linha_invalida_vira_none(self):
         self.assertIsNone(coletor.total_e_ocupado_do_proc_stat("intr 123 456"))
+
+    def test_nucleos_separa_agregado_e_cada_nucleo(self):
+        raw = (
+            "cpu  40 0 20 320 20 0 0 0\n"
+            "cpu0 10 0 5 80 5 0 0 0\n"
+            "cpu1 30 0 15 240 15 0 0 0\n"
+            "intr 999\nctxt 12345\n"
+        )
+        r = coletor.nucleos_do_proc_stat(raw)
+        self.assertEqual(set(r), {"cpu", "cpu0", "cpu1"})  # intr/ctxt fora
+        self.assertEqual(r["cpu"], (60, 400))  # ocupado=tudo-idle-iowait
+        self.assertEqual(r["cpu0"], (15, 100))
+
+    def test_nucleos_vazio_nao_quebra(self):
+        self.assertEqual(coletor.nucleos_do_proc_stat(""), {})
 
 
 class TestWifi(unittest.TestCase):
