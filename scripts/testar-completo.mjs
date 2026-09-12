@@ -64,6 +64,7 @@ function ambiente({tokenInicial = '', status = 200} = {}) {
     createElement: () => new Elemento(),
     createElementNS: () => new Elemento(),
     createTextNode: t => ({textContent: String(t)}),
+    querySelectorAll: () => [],
     addEventListener: () => {},
   };
   let chamadas = 0;
@@ -104,15 +105,14 @@ const espera = () => new Promise(r => setTimeout(r, 0));
   await espera();
   a.get('campo-token').value = '  token-de-teste  ';
   a.get('lembrar').checked = true;
-  await a.get('entrar').events.click();
+  await a.get('form-token').events.submit({preventDefault() {}});
   await espera(); await espera();
   assert.equal(a.get('conteudo').hidden, false, 'conteúdo aparece após entrar');
   assert.ok(a.chamadas() >= 4, 'buscou estado, históricos e trajeto');
-  // visão geral: um cartão por tipo (5)
-  assert.equal(a.get('cartoes-tipos').children.length, 5, 'cinco cartões de tipo');
-  // saúde preenchida
-  assert.match(a.get('s-temp').textContent, /66/);
-  assert.match(a.get('s-cpu').textContent, /10/);
+  // sinais vitais: 6 tiles (estado geral, temp, cpu, memória, bateria, ligado)
+  assert.equal(a.get('vitais').children.length, 6, 'seis sinais vitais');
+  // detalhe do Pi: 6 pares (freq, governor, voltagem, disco, swap, processos)
+  assert.equal(a.get('pi-detalhe').children.length, 6, 'seis detalhes do Pi');
   assert.equal(a.get('s-nucleos').children.length, 4, 'quatro núcleos');
   // gráficos de sistema montados (5 figuras: temp, cpu, núcleos, memória, freq)
   assert.equal(a.get('g-sistema').children.length, 5, 'cinco gráficos de sistema');
@@ -126,7 +126,7 @@ const espera = () => new Promise(r => setTimeout(r, 0));
   await espera(); await espera();
   assert.equal(a.get('portao').hidden, true, 'sem portão quando já há token');
   assert.equal(a.get('conteudo').hidden, false);
-  assert.equal(a.get('sec-gps') && a.get('mapa-vazio').hidden, false, 'sem Leaflet, mostra "sem trajeto"');
+  assert.equal(a.get('mapa-vazio').hidden, false, 'sem Leaflet, mostra "sem trajeto"');
 }
 
 // 4) API 401: corta a sessão e volta ao portão com erro.
