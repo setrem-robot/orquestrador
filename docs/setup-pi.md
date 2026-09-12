@@ -1,7 +1,8 @@
 # Setup do Ambiente no Raspberry Pi
 
 O Pi roda o **broker MQTT local** (em container) e os **serviços Python** que
-fazem a ponte com o ESP32, leem o GPS e orquestram os comandos.
+fazem a ponte com o ESP32, leem o GPS, orquestram os comandos e reportam a
+saúde do próprio Pi.
 
 ## 1. Pré-requisitos
 
@@ -47,16 +48,20 @@ Serviços instalados:
 |-------------------|--------------------------------------------------------|
 | `serial-ingestor` | Lê NDJSON da serial do ESP32 → `robo/comando/entrada`. |
 | `orquestrador`    | Roteia comandos e espelha telemetria para a nuvem.     |
+| `motores`         | Executa o movimento (`robo/motores/comando` → drivers TMC2209). |
 | `gps`             | Lê NMEA do GPS → `robo/gps/posicao`.                    |
 | `wifi`            | Aplica credencial de Wi-Fi (comando MQTT) → `robo/sistema/wifi`. |
+| `telemetria`      | Publica a saúde do próprio Pi → `robo/telemetria/sistema`. |
 
 ### Rodar manualmente (para testar)
 
 ```bash
 SERIAL_PORT=/dev/ttyUSB0 pi/.venv/bin/serial-ingestor
 pi/.venv/bin/orquestrador
+MOTORES_BACKEND=simulado pi/.venv/bin/motores   # simulado: sem GPIO, só loga
 GPS_PORT=/dev/serial0 pi/.venv/bin/gps
 sudo WIFI_IFACE=wlan0 pi/.venv/bin/wifi   # precisa de root (nmcli)
+pi/.venv/bin/telemetria   # saúde do Pi; roda em qualquer máquina (degrada fora do Pi)
 ```
 
 ### Rodar como serviço (systemd)
@@ -67,10 +72,12 @@ repo não estiver em `/home/setrem/setrem-robot`, depois:
 ```bash
 sudo cp pi/systemd/robo-serial-ingestor.service /etc/systemd/system/
 sudo cp pi/systemd/robo-orquestrador.service     /etc/systemd/system/
+sudo cp pi/systemd/robo-motores.service          /etc/systemd/system/
 sudo cp pi/systemd/robo-gps.service              /etc/systemd/system/
 sudo cp pi/systemd/robo-wifi.service             /etc/systemd/system/
+sudo cp pi/systemd/robo-telemetria.service       /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now robo-serial-ingestor robo-orquestrador robo-gps robo-wifi
+sudo systemctl enable --now robo-serial-ingestor robo-orquestrador robo-motores robo-gps robo-wifi robo-telemetria
 journalctl -u robo-orquestrador -f
 ```
 

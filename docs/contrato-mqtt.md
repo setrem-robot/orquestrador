@@ -168,8 +168,15 @@ Cada mensagem da rota segura, já validada, republicada pelo orquestrador.
 | `robo/motores/status`      | grupo Movimento   | sim      | `{"acao":"frente","velocidade":80,"esquerda":0.8,"direita":0.8}` |
 | `robo/sistema/bateria`     | (a definir)       | sim      | `{"percentual":83,"tensao_v":12.4}` |
 | `robo/sistema/wifi`        | serviço `wifi`    | sim      | `{"conectado":true,"ssid":"MinhaRede","ip":"192.168.0.42","ts":...}` |
+| `robo/telemetria/sistema`  | serviço `telemetria` | não   | `{"temperatura_c":66.4,"cpu":{"uso_pct":8.3,"por_nucleo":[7,9,8,10],"freq_mhz":1500,"governor":"ondemand","voltagem_v":0.86},"memoria":{"uso_pct":55,"disponivel_mb":3600,"swap_total_mb":2048,"swap_usado_mb":0},"disco":{"uso_pct":42,"livre_gb":16},"throttled":{"ok":true,...},"processos":{"rodando":2,"total":210},"rede":{"eth0":{"rx_mb":1.1,"tx_mb":0.4}},"uptime_s":7200,"ts":...}` |
 | `robo/sistema/heartbeat/<servico>` | cada serviço | sim | `{"servico":"gps","status":"online","ts":...}` |
 | `robo/sistema/bridge_status` | bridge Mosquitto | sim     | `1` (conectado) / `0` (desconectado) |
+
+A **saúde do Pi** (`robo/telemetria/sistema`) é o único tipo que hoje flui de
+verdade, do serviço `telemetria` (`pi/services/telemetria/`). Ele publica
+**direto** sob `robo/telemetria/`, sem passar pelo orquestrador: a saúde do Pi
+só existe para o histórico e não tem consumidor local, então mandá-la ao tópico
+espelhado a leva à nuvem pela bridge mesmo com o roteador fora do ar.
 
 ## Telemetria espelhada para a nuvem
 
@@ -185,6 +192,12 @@ O orquestrador republica os tópicos vivos selecionados sob `robo/telemetria/<ti
 A bridge do Mosquitto replica `robo/telemetria/#` (direção `out`) para o broker
 remoto. O `ingestor` cloud grava cada mensagem na hypertable `telemetria` do
 TimescaleDB, usando o campo `ts` do payload como instante do dado.
+
+A API de leitura (`cloud/api/`) serve esse histórico. A rota `GET
+/v1/serie/<tipo>` aceita `campo` **aninhado**, com pontos (`cpu.uso_pct`,
+`memoria.uso_pct`): a saúde do Pi guarda os números dentro de blocos, e a
+consulta navega pelo payload (`payload->'cpu'->>'uso_pct'`) para dar histórico
+deles. Cada segmento passa por `campo_valido()` antes de entrar no SQL.
 
 ## Provisionamento de Wi-Fi
 

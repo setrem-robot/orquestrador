@@ -1,11 +1,12 @@
 # Site e painel da Atlas
 
-Duas áreas, na mesma instalação e sem processo de build:
+Três áreas, na mesma instalação e sem processo de build:
 
 | Caminho | Uso |
 |---|---|
 | `/` | Apresentação do projeto, propósito, componentes e links para código |
-| `/painel/` | Consulta dos registros públicos e do trajeto recente |
+| `/painel/` | Consulta dos registros públicos e do trajeto recente (sem token) |
+| `/completo/` | Console de análise de **toda** a telemetria; pede token, guardado só no navegador |
 | `/api/*` | API existente; Caddy remove o prefixo antes de encaminhar |
 
 ## Prévia local
@@ -28,6 +29,8 @@ prévia indicada para consultar dados: o navegador pode recusar as requisições
 - `GET /api/v1/publico/resumo`: contagem de registros e última data por tipo.
 - `GET /api/v1/publico/trajeto?limite=300`: posições recentes com a precisão
   fornecida pelo serviço público.
+- `GET /api/v1/publico/saude`: a última leitura da saúde do Pi (temperatura,
+  CPU, memória, disco, rede) — sem token, porque não revela onde o robô está.
 - Consultas a cada 30 segundos, suspensas com a aba oculta, retomadas ao voltar.
 - Atualização manual, timeout, proteção contra consultas sobrepostas e falhas
   tratadas separadamente para resumo e trajeto.

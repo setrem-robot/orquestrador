@@ -119,7 +119,7 @@ E o caminho de volta, da posição do GPS até o gráfico no celular:
 
 ## 4. As peças, uma a uma
 
-### `pi/services/` — os cinco serviços
+### `pi/services/` — os seis serviços
 
 Cada um tem o seu `pyproject.toml`, roda como um serviço systemd separado, e
 compartilha só a biblioteca `robo_common`.
@@ -131,6 +131,7 @@ compartilha só a biblioteca `robo_common`.
 | **`motores`** | `robo/motores/comando` | `robo/motores/status` | Executa o movimento. |
 | **`gps`** | — | `robo/gps/posicao` | Lê NMEA e publica posição. |
 | **`wifi`** | `robo/wifi/comando` | `robo/sistema/wifi` | Provisiona rede com o `nmcli`. Roda como root. |
+| **`telemetria`** | — | `robo/telemetria/sistema` | Publica a saúde do próprio Pi (temperatura, CPU, memória, disco, rede, `throttled`). É o único já instalado no robô de produção. |
 
 ### `robo_common/` — a biblioteca compartilhada
 

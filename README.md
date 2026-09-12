@@ -14,9 +14,9 @@ está espalhada por três repositórios:
 
 | Repositório | O que é | O que faz |
 |---|---|---|
-| [**orquestrador**](https://github.com/setrem-robot/orquestrador) *(este)* | o corpo | motores, GPS, Wi-Fi, telemetria, nuvem |
-| [**atlas_ai_v2**](https://github.com/setrem-robot/atlas_ai_v2) | a cara | face animada, voz e conversa com IA |
-| [**aplicativo**](https://github.com/setrem-robot/aplicativo) | o controle | app Flutter: dirigir e ver os dados |
+| [**orquestrador**](https://github.com/setrem-robot/orquestrador) *(este)* | o corpo | motores, GPS, Wi-Fi, telemetria e a nuvem |
+| [**atlas_ai_v2**](https://github.com/setrem-robot/atlas_ai_v2) | a cara | face animada, voz, conversa com IA e a ponte Bluetooth |
+| [**aplicativo**](https://github.com/setrem-robot/aplicativo) | o controle | app Flutter: dirigir o robô e ver os dados |
 
 ---
 
@@ -36,23 +36,33 @@ está espalhada por três repositórios:
 
 Nada aqui é planejamento: tudo nesta lista roda e foi verificado.
 
-**O caminho de ida — do robô até o banco.** O robô publica telemetria num broker
-MQTT local; esse broker repassa (*bridge*) para o broker da nuvem; um ingestor
-lê e grava num TimescaleDB. A ponte guarda até 100 mil mensagens em disco
-enquanto a rede estiver fora, o que dá cerca de catorze horas de queda sem
-perder um ponto.
+**O caminho de ida — do robô até o banco.** No Pi de produção, o serviço
+`telemetria` publica a **saúde do próprio Raspberry Pi** (temperatura, CPU por
+núcleo, memória, disco, rede, `throttled`) num broker MQTT local; esse broker
+repassa (*bridge*) para o broker da nuvem; um ingestor lê e grava num
+TimescaleDB. A ponte guarda até 100 mil mensagens em disco enquanto a rede
+estiver fora, o que dá cerca de catorze horas de queda sem perder um ponto. Os
+outros tipos (GPS, bateria, motores) ainda entram semeados — ver [O que ainda
+falta](#o-que-ainda-falta).
 
 **O caminho de volta — do banco até o celular.** Uma API de leitura (FastAPI)
-serve o histórico, e o app Flutter mostra em quatro telas: estado agora, trajeto
-no mapa, gráficos e os eventos crus. A API está publicada na internet por um
-túnel da Cloudflare, com HTTPS válido.
+serve o histórico, e o app Flutter mostra em quatro abas: estado agora (com a
+saúde do Pi à frente), trajeto no mapa, gráficos com análise (mínimo, média,
+máximo, variação) e os eventos crus. A série aceita campos aninhados
+(`cpu.uso_pct`), o que dá histórico dos números que ficam dentro dos blocos do
+payload. A API está publicada na internet por um túnel da Cloudflare, com HTTPS
+válido.
+
+**Os painéis web.** A landing page e o painel público (`/painel/`) consomem as
+rotas **sem token** — mostram menos, o suficiente para ver que o robô existe e
+está vivo. Há ainda o console `/completo/`, com token, que abre toda a
+telemetria numa tela de análise. Ver [`site/README.md`](./site/README.md).
 
 **Os motores.** O comando do app vira velocidade de cada lado por cinemática
 diferencial, passa por uma rampa de aceleração e sai como onda quadrada do PWM
 nos drivers TMC2209. Um vigia para tudo se ficar um segundo sem receber comando.
-
-**A landing page.** HTML puro, consumindo as rotas públicas da API — as que não
-pedem token e mostram menos.
+(O código está pronto e testado, mas o serviço ainda **não** está instalado no
+Pi — ver a §0 do [`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md).)
 
 O que **não** é verdade ainda está em [O que ainda falta](#o-que-ainda-falta),
 com a mesma honestidade.
@@ -297,7 +307,7 @@ máquina ligada.
 o escuta: o repositório da cara ainda não reage a MQTT. Do mesmo jeito, ela não
 sabe a própria bateria — `robo/telemetria/bateria` também não tem ouvinte.
 
-**Refatorações conhecidas.** O `_parar`/`_tratar_sinal` está duplicado nos cinco
+**Refatorações conhecidas.** O `_parar`/`_tratar_sinal` está duplicado nos seis
 `main.py`, e `wifi/rede.py` ainda é função solta em vez de classe. Ficam
 registradas aqui como próximo passo, não como pendência esquecida.
 

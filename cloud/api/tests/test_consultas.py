@@ -82,11 +82,32 @@ class TestSerie(unittest.TestCase):
         for campo in ("percentual", "velocidade_kmh", "satelites", "tensao_v"):
             self.assertTrue(consultas.campo_valido(campo), campo)
 
+    def test_campo_aninhado_e_valido(self):
+        # A saúde do Pi guarda os números dentro de blocos; o gráfico de CPU e
+        # de memória depende de alcançar `cpu.uso_pct` e `memoria.uso_pct`.
+        for campo in ("cpu.uso_pct", "memoria.uso_pct", "cpu.freq_mhz"):
+            self.assertTrue(consultas.campo_valido(campo), campo)
+
+    def test_campo_aninhado_vira_navegacao_json(self):
+        sql, _ = consultas.serie("sistema", "cpu.uso_pct", None, None, "1h")
+        self.assertIn("payload->'cpu'->>'uso_pct'", sql)
+        self.assertIn("payload->'cpu' ? 'uso_pct'", sql)
+
     def test_campo_com_aspas_ou_espaco_e_recusado(self):
         # `campo` é interpolado no SQL (o operador ->> não aceita parâmetro
         # para a chave), então esta validação é a única coisa entre o cliente
         # e uma injeção.
-        for campo in ("perc'ual", "a; DROP TABLE telemetria", "a b", "", "x" * 41):
+        for campo in (
+            "perc'ual",
+            "a; DROP TABLE telemetria",
+            "a b",
+            "",
+            "x" * 41,
+            "cpu.",
+            ".uso_pct",
+            "a.b.c.d",  # níveis demais
+            "cpu.us'o",
+        ):
             self.assertFalse(consultas.campo_valido(campo), campo)
 
     def test_o_tipo_vai_como_parametro(self):
