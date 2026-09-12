@@ -214,7 +214,9 @@ async def trajeto(
 @app.get("/v1/serie/{tipo}", tags=["app"], dependencies=[Depends(exige_token)])
 async def serie(
     tipo: str,
-    campo: str = Query(description="campo numérico do payload, ex.: percentual"),
+    campo: str = Query(
+        description="campo numérico do payload; aninhado com pontos, ex.: percentual, cpu.uso_pct",
+    ),
     intervalo: str = Query(default="1h"),
     desde: datetime | None = None,
     ate: datetime | None = None,

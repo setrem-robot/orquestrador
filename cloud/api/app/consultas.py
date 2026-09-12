@@ -153,28 +153,60 @@ def serie(
     """
     inicio, fim = janela(desde, ate)
     passo = INTERVALOS[intervalo]
+    valor_sql, existe_sql = _expressao_campo(campo)
     sql = f"""
         SELECT time_bucket('{passo}', ts) AS instante,
-               avg((payload->>'{campo}')::double precision) AS valor,
+               avg(({valor_sql})::double precision) AS valor,
                count(*) AS amostras
         FROM telemetria
         WHERE tipo = %s
           AND ts BETWEEN %s AND %s
-          AND payload ? '{campo}'
+          AND {existe_sql}
         GROUP BY instante
         ORDER BY instante ASC
     """
     return sql, (tipo, inicio, fim)
 
 
+def _expressao_campo(campo: str) -> tuple[str, str]:
+    """Do nome do campo -> (expressão do valor, expressão de existência) em SQL.
+
+    Um campo pode ser aninhado, com pontos, para alcançar os blocos da saúde do
+    Pi. O último segmento sai como texto (`->>`), os anteriores navegam pelos
+    objetos (`->`):
+
+        "percentual"  -> ("payload->>'percentual'", "payload ? 'percentual'")
+        "cpu.uso_pct" -> ("payload->'cpu'->>'uso_pct'", "payload->'cpu' ? 'uso_pct'")
+
+    Cada segmento já passou por `campo_valido`, então nenhum carrega aspas — é
+    essa validação, e não esta função, que fica entre o cliente e uma injeção.
+    Uma linha cujo bloco pai não existe faz o teste de existência devolver nulo,
+    que o `WHERE` trata como falso, então ela fica de fora sem erro.
+    """
+    *pais, folha = campo.split(".")
+    base = "payload"
+    for pai in pais:
+        base += f"->'{pai}'"
+    return f"{base}->>'{folha}'", f"{base} ? '{folha}'"
+
+
 def campo_valido(campo: str) -> bool:
     """Se o nome do campo pode ser interpolado no SQL com segurança.
 
-    Letras, dígitos e sublinhado apenas — é o formato de toda chave que o robô
-    publica (`percentual`, `velocidade_kmh`, `satelites`). Qualquer coisa fora
-    disso é recusada antes de chegar perto da consulta.
+    Letras, dígitos e sublinhado em cada segmento, separados por pontos para os
+    campos aninhados (`cpu.uso_pct`, `memoria.uso_pct`) — é o formato de toda
+    chave que o robô publica. No máximo três níveis, para um ponto solto ou uma
+    cadeia sem fim não virar expressão estranha. Qualquer coisa fora disso é
+    recusada antes de chegar perto da consulta.
     """
-    return bool(campo) and len(campo) <= 40 and campo.replace("_", "").isalnum()
+    if not campo or len(campo) > 60:
+        return False
+    segmentos = campo.split(".")
+    if len(segmentos) > 3:
+        return False
+    return all(
+        seg and len(seg) <= 40 and seg.replace("_", "").isalnum() for seg in segmentos
+    )
 
 
 # ---------------------------------------------------------------------------

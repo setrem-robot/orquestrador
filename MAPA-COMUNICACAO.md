@@ -10,7 +10,7 @@ por qual transporte, em qual formato, e onde mora o contrato de cada conversa.
 > das três. Antes ele existia só na máquina de quem o escreveu, fora de qualquer
 > repositório: o mapa do sistema inteiro dependia de um disco não fazer barulho.
 >
-> **Última conferência contra o robô real:** 3 de setembro de 2026, por SSH em
+> **Última conferência contra o robô real:** 12 de setembro de 2026, por SSH em
 > `atlas@atlas.local`. A §0 diz o que estava no ar naquele dia.
 
 > **Para quem é isto?** Para quem (pessoa ou Claude) vai mexer em qualquer ponto
@@ -35,19 +35,24 @@ Os três repositórios (são pastas irmãs de onde este arquivo mora):
 > produção (`atlas@atlas.local`), conferido por SSH. A diferença entre os dois é
 > a explicação de por que o robô não anda.
 
-No Pi, hoje, rodam **três coisas** — e nenhuma delas é do repositório
-`orquestrador`:
+No Pi, hoje, rodam **quatro coisas** — a cara inteira, e do `orquestrador`
+apenas a telemetria:
 
 ```console
-$ systemctl list-units --type=service --state=running | grep -iE 'roboteye|mosquitto'
-mosquitto.service      Mosquitto MQTT Broker
-roboteye.service       RobotEye - face robotica com IA e voz
-roboteye-ble.service   RobotEye - ponte bluetooth para o controle do celular
+$ systemctl list-units --type=service --state=running | grep -iE 'roboteye|mosquitto|telemetria'
+mosquitto.service         Mosquitto MQTT Broker
+robo-telemetria.service   Robo PIE V - Telemetria de saude do Raspberry Pi -> MQTT
+roboteye.service          RobotEye - face robotica com IA e voz
+roboteye-ble.service      RobotEye - ponte bluetooth para o controle do celular
 ```
 
-Ou seja: **a cara está instalada, o corpo não.** Não existe `/opt`, `/srv` nem
-`~/robo` com os serviços do `pi/services/`; nenhum `motores`, `orquestrador`,
-`gps`, `wifi` ou `serial_ingestor` está registrado no systemd.
+Ou seja: **a cara está instalada, e do corpo só a telemetria.** O serviço
+`telemetria` (de `pi/services/telemetria/`) publica a saúde do Pi em
+`robo/telemetria/sistema`, e o Mosquitto do `apt` a espelha para a nuvem por
+*bridge* — é o que hoje enche o banco e alimenta o painel `/completo/`. O resto
+do `pi/services/` ainda **não** está instalado: nenhum `motores`,
+`orquestrador`, `gps`, `wifi` ou `serial_ingestor` está registrado no systemd,
+e é por isso que o robô continua sem andar.
 
 O efeito prático, seguindo o caminho de um comando de direção:
 

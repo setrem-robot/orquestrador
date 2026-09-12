@@ -22,11 +22,12 @@ comando de direção chega em `robo/comando/entrada` e para ali.
 
 - **`esp32/`** — firmware C++/Arduino. Ponte BLE ↔ Serial: valida JSON e
   repassa, não interpreta comandos.
-- **`pi/services/`** — cinco serviços Python independentes, cada um seu
+- **`pi/services/`** — seis serviços Python independentes, cada um seu
   próprio `pyproject.toml`, todos instalados num venv compartilhado
   (`pi/scripts/install.sh`) e rodando como serviço systemd: `serial_ingestor`,
-  `orquestrador` (o roteador), `motores`, `gps`, `wifi`. Compartilham a lib
-  `robo_common` (tópicos MQTT + `MqttService`).
+  `orquestrador` (o roteador), `motores`, `gps`, `wifi` e `telemetria` (saúde
+  do Pi → `robo/telemetria/sistema`; o único já instalado no robô de produção).
+  Compartilham a lib `robo_common` (tópicos MQTT + `MqttService`).
 - **`cloud/`** — Mosquitto remoto + `ingestor` + TimescaleDB + **`api`** +
   **`cloudflared`**, via Docker Compose. Os três primeiros são o caminho de ida
   (robô → banco); os dois últimos são o de volta, que faltava: um celular não
