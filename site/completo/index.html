@@ -3,126 +3,122 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090f15">
-  <title>Análise completa — Atlas</title>
-  <meta name="description" content="Painel de análise completa da Atlas: toda a telemetria do robô, valores atuais e histórico. Acesso com token.">
+  <meta name="theme-color" content="#0a1017">
+  <title>Console Atlas — análise</title>
+  <meta name="description" content="Console de análise da Atlas: sinais vitais do robô num relance e o histórico completo de cada fonte. Acesso com token.">
   <meta name="robots" content="noindex">
   <link rel="icon" href="../assets/atlas.png" type="image/png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="../estilo.css">
 </head>
-<body>
+<body class="console">
   <a class="pular" href="#conteudo">Pular para os dados</a>
-  <header class="topo"><div class="faixa">
-    <a class="marca" href="../" aria-label="Atlas, apresentação do projeto"><img src="../assets/atlas.png" alt="" width="38" height="38">atlas<span class="marca-nota">/ ANÁLISE</span></a>
-    <nav aria-label="Navegação principal"><a href="../">O projeto</a><a href="../painel/">Painel público</a><a class="nav-painel" href="./" aria-current="page">Análise completa</a></nav>
-  </div></header>
 
   <!-- Portão de token: nada carrega antes de o token ser informado. -->
-  <section id="portao" class="faixa portao" hidden>
-    <div class="portao-caixa">
-      <h1>Análise completa</h1>
-      <p>Esta tela mostra <strong>toda</strong> a telemetria do robô — valores atuais, histórico e log cru. Para isso ela usa a API com token.</p>
-      <label for="campo-token">Token de acesso (<code>API_TOKEN</code>)</label>
+  <section id="portao" class="portao" hidden>
+    <form class="portao-caixa" id="form-token">
+      <img src="../assets/atlas.png" alt="" width="46" height="46" class="portao-marca">
+      <h1>Console da Atlas</h1>
+      <p>Toda a telemetria do robô — vitais num relance e o histórico de cada sinal. Para ver tudo, a tela usa a API com o seu token.</p>
+      <label for="campo-token">Token de acesso</label>
       <input id="campo-token" type="password" autocomplete="off" spellcheck="false" placeholder="cole o token aqui">
-      <p id="portao-erro" class="aviso" role="alert" hidden></p>
-      <div class="portao-acoes">
-        <label class="lembrar"><input type="checkbox" id="lembrar" checked> Lembrar neste navegador</label>
-        <button type="button" id="entrar" class="botao primario">Entrar</button>
-      </div>
-      <p class="portao-nota">O token fica <strong>só neste navegador</strong> (armazenamento local) e vai apenas para a API da Atlas. Ele não é enviado a mais ninguém nem sai deste dispositivo. Use “Sair” para apagá-lo.</p>
-    </div>
+      <p id="portao-erro" class="portao-msg" role="alert" hidden></p>
+      <label class="lembrar"><input type="checkbox" id="lembrar" checked> Lembrar neste navegador</label>
+      <button type="submit" id="entrar" class="botao primario largo">Entrar</button>
+      <p class="portao-nota">O token fica só neste navegador e vai apenas para a API da Atlas. Use “Sair” para apagá-lo.</p>
+    </form>
   </section>
 
-  <main id="conteudo" class="faixa painel-app" hidden>
-    <div class="painel-cabecalho">
-      <div><p class="sobrelinha">TELEMETRIA COMPLETA · COM TOKEN</p><h1>Análise da Atlas</h1><p>Todos os sinais do robô: estado atual, histórico e eventos.</p></div>
-      <div class="cabecalho-acoes">
-        <span id="estado-conexao" class="estado" role="status" aria-live="polite">Carregando…</span>
-        <label class="auto"><input type="checkbox" id="auto" checked> Atualizar sozinho</label>
-        <button type="button" id="atualizar" class="botao">Atualizar <span aria-hidden="true">↻</span></button>
-        <button type="button" id="sair" class="botao">Sair</button>
+  <div id="conteudo" hidden>
+    <header class="console-topo">
+      <div class="faixa console-topo-linha">
+        <a class="marca" href="../painel/" aria-label="Painel público da Atlas"><img src="../assets/atlas.png" alt="" width="34" height="34">atlas<span class="marca-nota">console</span></a>
+        <div class="topo-controles">
+          <span id="estado-conexao" class="estado" role="status" aria-live="polite">carregando…</span>
+          <span id="ultima-consulta" class="topo-hora" title="Última atualização">—</span>
+          <label class="alternar" title="Atualizar automaticamente"><input type="checkbox" id="auto" checked> auto</label>
+          <button type="button" id="atualizar" class="icone" title="Atualizar agora" aria-label="Atualizar agora">↻</button>
+          <button type="button" id="sair" class="icone" title="Sair e apagar o token" aria-label="Sair">⏻</button>
+        </div>
       </div>
-    </div>
-    <div class="barra-estado"><p id="ultima-consulta" class="meta">—</p><p class="meta" id="janela-hist">Histórico: últimas leituras</p></div>
-    <p id="aviso" class="aviso" role="status" hidden></p>
+    </header>
 
-    <!-- 1. Visão geral: um cartão por tipo -->
-    <section class="bloco" aria-labelledby="geral-titulo">
-      <div class="bloco-titulo"><h2 id="geral-titulo">Visão geral</h2><p>Última leitura de cada fonte de telemetria e há quanto tempo chegou.</p></div>
-      <ul id="cartoes-tipos" class="cartoes-tipos"><li class="sem-registro">Consultando…</li></ul>
-    </section>
+    <main id="conteudo-main" class="faixa console-main">
+      <p id="aviso" class="aviso" role="status" hidden></p>
 
-    <!-- 2. Saúde do Pi -->
-    <section class="bloco" aria-labelledby="saude-titulo" id="sec-saude">
-      <div class="bloco-titulo saude-cabecalho"><div><h2 id="saude-titulo">Saúde do Raspberry Pi</h2><p>Processamento, temperatura, memória e energia — dados reais do robô.</p></div><span id="s-estado" class="estado">—</span></div>
-      <ul class="metricas metricas-saude" aria-label="Saúde do Pi">
-        <li class="metrica"><span class="rotulo">Temperatura</span><strong class="valor" id="s-temp">—</strong><span class="detalhe" id="s-throttled">—</span></li>
-        <li class="metrica"><span class="rotulo">Processador</span><strong class="valor" id="s-cpu">—</strong><span class="detalhe" id="s-freq">—</span></li>
-        <li class="metrica"><span class="rotulo">Memória</span><strong class="valor" id="s-mem">—</strong><span class="detalhe" id="s-swap">—</span></li>
-        <li class="metrica"><span class="rotulo">Tempo ligado</span><strong class="valor" id="s-uptime">—</strong><span class="detalhe" id="s-disco">—</span></li>
-      </ul>
-      <div class="nucleos"><span class="rotulo-bloco">Consumo por núcleo (agora)</span><ul id="s-nucleos" class="lista-nucleos"><li class="sem-registro">—</li></ul></div>
-      <div class="graficos" id="g-sistema"></div>
-      <div class="painel-grid grid-saude">
-        <div><span class="rotulo-bloco">Estado de energia e térmica (throttled)</span><ul id="s-flags" class="lista-flags"></ul></div>
-        <div><span class="rotulo-bloco">Rede acumulada</span><ul id="s-rede" class="lista-flags"></ul></div>
-      </div>
-    </section>
+      <!-- Sinais vitais: o "está tudo bem?" num relance -->
+      <section aria-label="Sinais vitais do robô">
+        <div id="vitais" class="vitais"><p class="carregando">Lendo os sinais…</p></div>
+      </section>
 
-    <!-- 3. Energia -->
-    <section class="bloco" aria-labelledby="bat-titulo" id="sec-bateria">
-      <div class="bloco-titulo"><h2 id="bat-titulo">Energia <span class="demo-tag" id="bat-demo" hidden>demonstração</span></h2><p>Carga da bateria e tensão.</p></div>
-      <ul class="metricas metricas-saude">
-        <li class="metrica"><span class="rotulo">Carga</span><strong class="valor" id="b-pct">—</strong><span class="detalhe">Percentual</span></li>
-        <li class="metrica"><span class="rotulo">Tensão</span><strong class="valor" id="b-volt">—</strong><span class="detalhe">Volts</span></li>
-      </ul>
-      <div class="graficos" id="g-bateria"></div>
-    </section>
+      <!-- Abas: detalhe a um clique, sem rolagem infinita -->
+      <nav class="abas" role="tablist" aria-label="Seções">
+        <button class="aba" id="aba-pi" role="tab" aria-controls="painel-pi" aria-selected="true" data-alvo="painel-pi">Saúde do Pi</button>
+        <button class="aba" id="aba-sensores" role="tab" aria-controls="painel-sensores" aria-selected="false" data-alvo="painel-sensores">Sensores</button>
+        <button class="aba" id="aba-local" role="tab" aria-controls="painel-local" aria-selected="false" data-alvo="painel-local">Localização</button>
+        <button class="aba" id="aba-eventos" role="tab" aria-controls="painel-eventos" aria-selected="false" data-alvo="painel-eventos">Eventos</button>
+      </nav>
 
-    <!-- 4. Movimento -->
-    <section class="bloco" aria-labelledby="mot-titulo" id="sec-motores">
-      <div class="bloco-titulo"><h2 id="mot-titulo">Movimento <span class="demo-tag" id="mot-demo" hidden>demonstração</span></h2><p>Última ação dos motores e velocidade de cada lado.</p></div>
-      <ul class="metricas metricas-saude">
-        <li class="metrica"><span class="rotulo">Ação</span><strong class="valor" id="m-acao">—</strong><span class="detalhe" id="m-vel">—</span></li>
-        <li class="metrica"><span class="rotulo">Esquerda</span><strong class="valor" id="m-esq">—</strong><span class="detalhe">-1 a 1</span></li>
-        <li class="metrica"><span class="rotulo">Direita</span><strong class="valor" id="m-dir">—</strong><span class="detalhe">-1 a 1</span></li>
-      </ul>
-      <div class="graficos" id="g-motores"></div>
-    </section>
+      <!-- Aba: Saúde do Pi -->
+      <section id="painel-pi" class="aba-conteudo" role="tabpanel" aria-labelledby="aba-pi" tabindex="0">
+        <ul id="pi-detalhe" class="detalhe-linha" aria-label="Detalhes do processador e memória"></ul>
+        <div class="cartao">
+          <h2>Consumo por núcleo <span class="cartao-nota">agora</span></h2>
+          <ul id="s-nucleos" class="lista-nucleos"><li class="sem-registro">—</li></ul>
+        </div>
+        <div class="graficos" id="g-sistema"></div>
+        <div class="dois">
+          <div class="cartao"><h2>Energia e temperatura</h2><ul id="s-flags" class="lista-flags"></ul></div>
+          <div class="cartao"><h2>Rede e processos</h2><ul id="s-rede" class="lista-flags"></ul></div>
+        </div>
+      </section>
 
-    <!-- 5. Localização -->
-    <section class="bloco" aria-labelledby="gps-titulo" id="sec-gps">
-      <div class="bloco-titulo"><h2 id="gps-titulo">Localização <span class="demo-tag" id="gps-demo" hidden>demonstração</span></h2><p>Trajeto em precisão total (rota com token) e posição atual.</p></div>
-      <ul class="metricas metricas-saude">
-        <li class="metrica"><span class="rotulo">Latitude</span><strong class="valor peq" id="g-lat">—</strong><span class="detalhe" id="g-fix">—</span></li>
-        <li class="metrica"><span class="rotulo">Longitude</span><strong class="valor peq" id="g-lon">—</strong><span class="detalhe" id="g-sat">—</span></li>
-        <li class="metrica"><span class="rotulo">Velocidade</span><strong class="valor" id="g-vel">—</strong><span class="detalhe">km/h</span></li>
-      </ul>
-      <div id="mapa" class="mapa" hidden></div>
-      <div id="mapa-vazio" class="mapa-vazio"><div><strong>Sem trajeto</strong><p>Nenhum ponto de GPS com sinal no período.</p></div></div>
-      <div class="bloco-rodape" id="g-pontos">—</div>
-    </section>
+      <!-- Aba: Sensores -->
+      <section id="painel-sensores" class="aba-conteudo" role="tabpanel" aria-labelledby="aba-sensores" tabindex="0" hidden>
+        <div class="dois">
+          <div class="cartao">
+            <h2>Energia <span class="demo-tag" id="bat-demo" hidden>demonstração</span></h2>
+            <div class="par-num"><div><strong class="valor" id="b-pct">—</strong><span class="rotulo">carga</span></div><div><strong class="valor" id="b-volt">—</strong><span class="rotulo">tensão (V)</span></div></div>
+            <div class="graficos" id="g-bateria"></div>
+          </div>
+          <div class="cartao">
+            <h2>Movimento <span class="demo-tag" id="mot-demo" hidden>demonstração</span></h2>
+            <div class="par-num"><div><strong class="valor" id="m-acao">—</strong><span class="rotulo" id="m-vel">ação</span></div><div><strong class="valor" id="m-esq">—</strong><span class="rotulo">esquerda</span></div><div><strong class="valor" id="m-dir">—</strong><span class="rotulo">direita</span></div></div>
+            <div class="graficos" id="g-motores"></div>
+          </div>
+        </div>
+        <div class="cartao"><h2>Rede Wi-Fi <span class="demo-tag" id="wifi-demo" hidden>demonstração</span></h2><ul id="w-lista" class="lista-flags"></ul></div>
+      </section>
 
-    <!-- 6. Rede Wi-Fi -->
-    <section class="bloco" aria-labelledby="wifi-titulo" id="sec-wifi">
-      <div class="bloco-titulo"><h2 id="wifi-titulo">Rede Wi-Fi <span class="demo-tag" id="wifi-demo" hidden>demonstração</span></h2><p>Conexão relatada pelo serviço de rede e sinal medido pelo Pi.</p></div>
-      <ul id="w-lista" class="lista-flags"></ul>
-    </section>
+      <!-- Aba: Localização -->
+      <section id="painel-local" class="aba-conteudo" role="tabpanel" aria-labelledby="aba-local" tabindex="0" hidden>
+        <ul class="detalhe-linha">
+          <li><span class="rotulo">Latitude</span><strong id="g-lat">—</strong></li>
+          <li><span class="rotulo">Longitude</span><strong id="g-lon">—</strong></li>
+          <li><span class="rotulo">Sinal</span><strong id="g-fix">—</strong></li>
+          <li><span class="rotulo">Satélites</span><strong id="g-sat">—</strong></li>
+          <li><span class="rotulo">Velocidade</span><strong id="g-vel">—</strong></li>
+        </ul>
+        <div class="cartao sem-corpo">
+          <div id="mapa" class="mapa" hidden></div>
+          <div id="mapa-vazio" class="mapa-vazio"><div><strong>Sem trajeto</strong><p>Nenhum ponto de GPS com sinal no período.</p></div></div>
+          <div class="cartao-rodape" id="g-pontos">—</div>
+        </div>
+      </section>
 
-    <!-- 7. Log cru -->
-    <section class="bloco" aria-labelledby="log-titulo" id="sec-log">
-      <div class="bloco-titulo log-cabecalho"><div><h2 id="log-titulo">Eventos (cru)</h2><p>As mensagens como chegaram — para depurar.</p></div>
-        <label class="filtro">Tipo <select id="log-tipo"><option value="">todos</option><option>sistema</option><option>gps</option><option>motores</option><option>bateria</option><option>wifi</option></select></label>
-      </div>
-      <div class="tabela-rolagem"><table class="tabela-log"><thead><tr><th>Quando</th><th>Tipo</th><th>Tópico</th><th>Payload</th></tr></thead><tbody id="log-corpo"><tr><td colspan="4" class="sem-registro">Consultando…</td></tr></tbody></table></div>
-      <div class="bloco-rodape"><button type="button" id="log-mais" class="botao">Carregar mais</button> <span id="log-info" class="meta"></span></div>
-    </section>
+      <!-- Aba: Eventos -->
+      <section id="painel-eventos" class="aba-conteudo" role="tabpanel" aria-labelledby="aba-eventos" tabindex="0" hidden>
+        <div class="cartao sem-corpo">
+          <div class="log-cabecalho"><h2>Eventos, como chegaram</h2><label class="filtro">Tipo <select id="log-tipo"><option value="">todos</option><option>sistema</option><option>gps</option><option>motores</option><option>bateria</option><option>wifi</option></select></label></div>
+          <div class="tabela-rolagem"><table class="tabela-log"><thead><tr><th>Quando</th><th>Tipo</th><th>Tópico</th><th>Payload</th></tr></thead><tbody id="log-corpo"><tr><td colspan="4" class="sem-registro">Consultando…</td></tr></tbody></table></div>
+          <div class="cartao-rodape log-rodape"><button type="button" id="log-mais" class="botao">Carregar mais</button> <span id="log-info" class="meta"></span></div>
+        </div>
+      </section>
 
-    <p class="painel-nota">Dados marcados como “demonstração” foram semeados para testar a pilha; ainda não vêm dos sensores do robô. A saúde do Pi é real. Uma resposta da API não garante que o robô está ligado — confira a idade de cada leitura.</p>
-  </main>
-
-  <footer class="faixa rodape"><p>Atlas · Engenharia de Computação · SETREM</p><a href="../painel/">Painel público <span aria-hidden="true">↗</span></a></footer>
+      <p class="console-nota">Dados marcados <em>demonstração</em> foram semeados para testar a pilha; a saúde do Pi é real. A idade de cada leitura fica sempre à vista — uma resposta da API não garante que o robô está ligado.</p>
+    </main>
+    <footer class="faixa rodape"><p>Atlas · Engenharia de Computação · SETREM</p><a href="../painel/">Painel público <span aria-hidden="true">↗</span></a></footer>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="../config.js" defer></script>
