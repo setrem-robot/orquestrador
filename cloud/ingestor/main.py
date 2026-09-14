@@ -59,7 +59,7 @@ INSERT_SQL = (
 )
 
 
-def conectar_banco() -> psycopg.Connection:
+def conectarBanco() -> psycopg.Connection:
     """Abre a conexão com o TimescaleDB, esperando o banco subir.
 
     No `docker compose up` o ingestor pode iniciar antes do banco aceitar
@@ -75,12 +75,12 @@ def conectar_banco() -> psycopg.Connection:
             time.sleep(3)
 
 
-def _tipo_do_topico(topico: str) -> str:
+def tipoDoTopico(topico: str) -> str:
     """Extrai o <tipo> de robo/telemetria/<tipo> (último segmento)."""
     return topico.rsplit("/", 1)[-1] or "desconhecido"
 
 
-def _timestamp_do_payload(payload: dict) -> datetime:
+def timestampDoPayload(payload: dict) -> datetime:
     """Usa o campo 'ts' (epoch em segundos) do payload, se presente e válido.
 
     Preferimos o instante em que o dado foi GERADO no robô; só caímos para o
@@ -97,22 +97,22 @@ def _timestamp_do_payload(payload: dict) -> datetime:
 
 class Ingestor:
     def __init__(self) -> None:
-        self._conn = conectar_banco()
-        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="ingestor")
+        self.conn = conectarBanco()
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="ingestor")
         if MQTT_USERNAME:
-            self._client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
-        self._client.on_connect = self._on_connect
-        self._client.on_message = self._on_message
+            self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.on_connect = self.onConnect
+        self.client.on_message = self.onMessage
 
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
-        if reason_code != 0:
-            logger.error("Falha ao conectar no broker remoto (rc=%s).", reason_code)
+    def onConnect(self, client, userdata, flags, reasonCode, properties):
+        if reasonCode != 0:
+            logger.error("Falha ao conectar no broker remoto (rc=%s).", reasonCode)
             return
         logger.info("Conectado ao broker remoto; assinando %s", MQTT_TOPIC)
         client.subscribe(MQTT_TOPIC, qos=1)
 
-    def _on_message(self, client, userdata, message):
+    def onMessage(self, client, userdata, message):
         try:
             payload = json.loads(message.payload.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -123,19 +123,19 @@ class Ingestor:
             return
 
         registro = (
-            _timestamp_do_payload(payload),
-            _tipo_do_topico(message.topic),
+            timestampDoPayload(payload),
+            tipoDoTopico(message.topic),
             message.topic,
             json.dumps(payload),
         )
-        self._gravar(registro)
+        self.gravar(registro)
 
-    def _gravar(self, registro: tuple) -> None:
+    def gravar(self, registro: tuple) -> None:
         # Uma reconexão ao banco cobre o caso de o Postgres reiniciar embaixo
         # de nós; uma única retentativa evita perder a mensagem nesse caso.
         for tentativa in (1, 2):
             try:
-                with self._conn.cursor() as cur:
+                with self.conn.cursor() as cur:
                     cur.execute(INSERT_SQL, registro)
                 logger.info("Gravado: tipo=%s topico=%s", registro[1], registro[2])
                 return
@@ -145,16 +145,16 @@ class Ingestor:
                     tentativa, exc,
                 )
                 try:
-                    self._conn.close()
+                    self.conn.close()
                 except Exception:
                     pass
-                self._conn = conectar_banco()
+                self.conn = conectarBanco()
         logger.error("Mensagem descartada após falha de gravação: %s", registro[2])
 
     def run(self) -> None:
-        self._client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
+        self.client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
         # loop_forever cuida da reconexão automática ao broker.
-        self._client.loop_forever()
+        self.client.loop_forever()
 
 
 def main() -> None:

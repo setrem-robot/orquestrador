@@ -28,7 +28,7 @@ import time
 from typing import Any
 
 from robo_common import topics
-from robo_common.mqtt_client import MqttService
+from robo_common.mqttClient import MqttService
 
 from .roteador import rotear
 
@@ -55,82 +55,82 @@ ESPELHO_TELEMETRIA = {
 }
 
 # Flag de parada, acionada por SIGINT/SIGTERM (systemd manda SIGTERM ao parar).
-_parar = False
+parar = False
 
 
-def _tratar_sinal(signum, _frame) -> None:
-    global _parar
+def tratarSinal(signum, frame) -> None:
+    global parar
     logger.info("Sinal %s recebido; encerrando com elegância...", signum)
-    _parar = True
+    parar = True
 
 
-def _ao_receber_comando(mqtt_svc: MqttService, _topico: str, comando: dict[str, Any]) -> None:
+def aoReceberComando(mqttSvc: MqttService, topico: str, comando: dict[str, Any]) -> None:
     """Handler de robo/comando/entrada: roteia e publica."""
     publicacoes = rotear(comando)
     if not publicacoes:
         return
     for destino, payload in publicacoes:
-        mqtt_svc.publish_json(destino, payload, qos=1)
+        mqttSvc.publishJson(destino, payload, qos=1)
         logger.info("Comando %s roteado -> %s: %s", comando.get("tipo"), destino, payload)
 
 
-def _ao_receber_telemetria(
-    mqtt_svc: MqttService, destino: str, _topico: str, payload: dict[str, Any]
+def aoReceberTelemetria(
+    mqttSvc: MqttService, destino: str, topico: str, payload: dict[str, Any]
 ) -> None:
     """Handler genérico de espelhamento: republica o payload em telemetria/*.
 
     Usa retain para que um consumidor recém-conectado (ou a nuvem, ao
     reconectar a bridge) receba imediatamente o último valor conhecido.
     """
-    mqtt_svc.publish_json(destino, payload, qos=1, retain=True)
+    mqttSvc.publishJson(destino, payload, qos=1, retain=True)
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, _tratar_sinal)
-    signal.signal(signal.SIGTERM, _tratar_sinal)
+    signal.signal(signal.SIGINT, tratarSinal)
+    signal.signal(signal.SIGTERM, tratarSinal)
 
-    mqtt_svc = MqttService(
-        client_id=SERVICO,
+    mqttSvc = MqttService(
+        clientId=SERVICO,
         host=MQTT_HOST,
         port=MQTT_PORT,
-        heartbeat_topic=topics.heartbeat(SERVICO),
+        heartbeatTopic=topics.heartbeat(SERVICO),
     )
 
     # Roteamento de comandos.
-    mqtt_svc.on(
+    mqttSvc.on(
         topics.COMANDO_ENTRADA,
-        lambda topico, msg: _ao_receber_comando(mqtt_svc, topico, msg),
+        lambda topico, msg: aoReceberComando(mqttSvc, topico, msg),
     )
 
     # Espelhamento de telemetria: um handler por fonte, fixando o destino.
     for origem, destino in ESPELHO_TELEMETRIA.items():
-        mqtt_svc.on(
+        mqttSvc.on(
             origem,
-            lambda topico, msg, _destino=destino: _ao_receber_telemetria(
-                mqtt_svc, _destino, topico, msg
+            lambda topico, msg, destino=destino: aoReceberTelemetria(
+                mqttSvc, destino, topico, msg
             ),
         )
 
-    mqtt_svc.start()
+    mqttSvc.start()
     logger.info("Orquestrador no ar. Roteando comandos e espelhando telemetria.")
 
-    proximo_heartbeat = 0.0
+    proximoHeartbeat = 0.0
     try:
-        while not _parar:
+        while not parar:
             agora = time.monotonic()
-            if agora >= proximo_heartbeat:
-                mqtt_svc.publish_json(
+            if agora >= proximoHeartbeat:
+                mqttSvc.publishJson(
                     topics.heartbeat(SERVICO),
                     {"servico": SERVICO, "status": "online", "ts": time.time()},
                     qos=0,
                     retain=True,
                 )
-                proximo_heartbeat = agora + HEARTBEAT_INTERVALO_S
+                proximoHeartbeat = agora + HEARTBEAT_INTERVALO_S
             # O trabalho real acontece nos callbacks (thread do paho); aqui só
             # mantemos o processo vivo e responsivo a parada/heartbeat.
             time.sleep(0.5)
     finally:
-        mqtt_svc.stop()
+        mqttSvc.stop()
 
 
 if __name__ == "__main__":

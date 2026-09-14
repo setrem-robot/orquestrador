@@ -26,59 +26,59 @@ def recarregar(**ambiente):
 
 
 class TestToken(unittest.TestCase):
-    def test_token_certo_passa(self):
+    def testTokenCertoPassa(self):
         seg, _ = recarregar(API_TOKEN="segredo-do-robo")
-        self.assertTrue(seg.token_confere("Bearer segredo-do-robo"))
+        self.assertTrue(seg.tokenConfere("Bearer segredo-do-robo"))
 
-    def test_token_errado_nao_passa(self):
+    def testTokenErradoNaoPassa(self):
         seg, _ = recarregar(API_TOKEN="segredo-do-robo")
-        self.assertFalse(seg.token_confere("Bearer outro"))
+        self.assertFalse(seg.tokenConfere("Bearer outro"))
 
-    def test_sem_o_prefixo_bearer_nao_passa(self):
+    def testSemOPrefixoBearerNaoPassa(self):
         seg, _ = recarregar(API_TOKEN="segredo-do-robo")
-        self.assertFalse(seg.token_confere("segredo-do-robo"))
-        self.assertFalse(seg.token_confere(None))
+        self.assertFalse(seg.tokenConfere("segredo-do-robo"))
+        self.assertFalse(seg.tokenConfere(None))
 
-    def test_api_sem_token_configurado_recusa_todo_mundo(self):
+    def testApiSemTokenConfiguradoRecusaTodoMundo(self):
         # O contrário — servir o histórico inteiro a quem descobrir o endereço
         # — é o modo de falhar que ninguém percebe até ser tarde.
         seg, _ = recarregar(API_TOKEN="")
-        self.assertFalse(seg.token_configurado())
-        self.assertFalse(seg.token_confere("Bearer qualquer"))
-        self.assertFalse(seg.token_confere(""))
+        self.assertFalse(seg.tokenConfigurado())
+        self.assertFalse(seg.tokenConfere("Bearer qualquer"))
+        self.assertFalse(seg.tokenConfere(""))
 
 
 class TestPrecisaoPublica(unittest.TestCase):
-    def test_arredonda_para_onze_metros(self):
+    def testArredondaParaOnzeMetros(self):
         seg, _ = recarregar(PRECISAO_GPS_PUBLICA="4")
-        self.assertEqual(seg.arredondar_coordenada(-28.2456789), -28.2457)
+        self.assertEqual(seg.arredondarCoordenada(-28.2456789), -28.2457)
 
-    def test_zero_desliga(self):
+    def testZeroDesliga(self):
         seg, _ = recarregar(PRECISAO_GPS_PUBLICA="0")
-        self.assertEqual(seg.arredondar_coordenada(-28.2456789), -28.2456789)
+        self.assertEqual(seg.arredondarCoordenada(-28.2456789), -28.2456789)
 
-    def test_sem_coordenada_continua_sem(self):
+    def testSemCoordenadaContinuaSem(self):
         seg, _ = recarregar(PRECISAO_GPS_PUBLICA="4")
-        self.assertIsNone(seg.arredondar_coordenada(None))
+        self.assertIsNone(seg.arredondarCoordenada(None))
 
 
 class TestLimitador(unittest.TestCase):
-    def test_deixa_passar_ate_o_teto(self):
+    def testDeixaPassarAteOTeto(self):
         from app.seguranca import Limitador
 
-        limitador = Limitador(teto=3, janela_s=60.0)
+        limitador = Limitador(teto=3, janelaS=60.0)
         self.assertTrue(all(limitador.permitir("1.2.3.4") for _ in range(3)))
         self.assertFalse(limitador.permitir("1.2.3.4"))
 
-    def test_cada_cliente_tem_a_propria_cota(self):
+    def testCadaClienteTemAPropriaCota(self):
         from app.seguranca import Limitador
 
-        limitador = Limitador(teto=1, janela_s=60.0)
+        limitador = Limitador(teto=1, janelaS=60.0)
         self.assertTrue(limitador.permitir("1.2.3.4"))
         self.assertFalse(limitador.permitir("1.2.3.4"))
         self.assertTrue(limitador.permitir("5.6.7.8"))
 
-    def test_a_janela_expira(self):
+    def testAJanelaExpira(self):
         from app.seguranca import Limitador
 
         # Janela de zero: toda batida anterior já está velha na batida seguinte.
@@ -88,7 +88,7 @@ class TestLimitador(unittest.TestCase):
         # então duas chamadas seguidas devolvem o mesmo instante. Com a expiração
         # escrita como `> janela`, uma batida de idade exatamente zero nunca saía
         # de uma janela de tamanho zero, e a fila não esvaziava nunca.
-        limitador = Limitador(teto=1, janela_s=0.0)
+        limitador = Limitador(teto=1, janelaS=0.0)
         self.assertTrue(limitador.permitir("1.2.3.4"))
         self.assertTrue(limitador.permitir("1.2.3.4"))
 
@@ -96,7 +96,7 @@ class TestLimitador(unittest.TestCase):
 class TestCacheCurto(unittest.TestCase):
     """O resumo público é a consulta mais cara servida sem token."""
 
-    def test_devolve_o_que_guardou(self):
+    def testDevolveOQueGuardou(self):
         from app.seguranca import CacheCurto
 
         cache = CacheCurto(60.0)
@@ -104,7 +104,7 @@ class TestCacheCurto(unittest.TestCase):
         cache.guardar({"tipos": []})
         self.assertEqual(cache.obter(), {"tipos": []})
 
-    def test_validade_zero_nao_guarda_nada(self):
+    def testValidadeZeroNaoGuardaNada(self):
         """Serve para desligar o cache pela configuração, sem tirar o código."""
         from app.seguranca import CacheCurto
 
@@ -112,13 +112,13 @@ class TestCacheCurto(unittest.TestCase):
         cache.guardar({"tipos": []})
         self.assertIsNone(cache.obter())
 
-    def test_o_valor_vence_com_o_tempo(self):
+    def testOValorVenceComOTempo(self):
         from app import seguranca
 
         cache = seguranca.CacheCurto(10.0)
         cache.guardar("velho")
         # Sem esperar de verdade: o relógio é o do módulo, e ele pode andar.
-        cache._gravado_em -= 11.0
+        cache.gravadoEm -= 11.0
         self.assertIsNone(cache.obter())
 
 

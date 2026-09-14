@@ -28,7 +28,7 @@ _BITS_THROTTLED = {
 }
 
 
-def parse_temperatura(raw: str) -> float | None:
+def parseTemperatura(raw: str) -> float | None:
     """`/sys/class/thermal/thermal_zone0/temp` (milésimos de grau) -> °C.
 
     "54321\\n" -> 54.3. Vazio ou lixo -> None, para o payload dizer "não sei"
@@ -43,7 +43,7 @@ def parse_temperatura(raw: str) -> float | None:
         return None
 
 
-def parse_throttled(raw: str) -> dict | None:
+def parseThrottled(raw: str) -> dict | None:
     """`vcgencmd get_throttled` -> flags + o hex cru.
 
     A saída é "throttled=0x50005". Guardamos o hex (para conferência) e
@@ -68,7 +68,7 @@ def parse_throttled(raw: str) -> dict | None:
     return flags
 
 
-def parse_loadavg(raw: str) -> dict | None:
+def parseLoadavg(raw: str) -> dict | None:
     """`/proc/loadavg` -> carga média de 1, 5 e 15 minutos.
 
     "0.52 0.41 0.38 1/234 5678" -> {"1m":0.52,"5m":0.41,"15m":0.38}.
@@ -82,7 +82,7 @@ def parse_loadavg(raw: str) -> dict | None:
         return None
 
 
-def parse_meminfo(raw: str) -> dict | None:
+def parseMeminfo(raw: str) -> dict | None:
     """`/proc/meminfo` -> memória e swap em MB e porcentagem em uso.
 
     Usa `MemAvailable` (o que dá para usar de fato, contando cache liberável),
@@ -108,22 +108,22 @@ def parse_meminfo(raw: str) -> dict | None:
         "disponivel_mb": round(disponivel / 1024),
         "uso_pct": round(usado / total * 100, 1),
     }
-    swap_total = campos.get("SwapTotal")
-    swap_livre = campos.get("SwapFree")
-    if swap_total is not None and swap_livre is not None:
-        resultado["swap_total_mb"] = round(swap_total / 1024)
-        resultado["swap_usado_mb"] = round((swap_total - swap_livre) / 1024)
+    swapTotal = campos.get("SwapTotal")
+    swapLivre = campos.get("SwapFree")
+    if swapTotal is not None and swapLivre is not None:
+        resultado["swap_total_mb"] = round(swapTotal / 1024)
+        resultado["swap_usado_mb"] = round((swapTotal - swapLivre) / 1024)
     return resultado
 
 
-def parse_processos(raw_loadavg: str) -> dict | None:
+def parseProcessos(rawLoadavg: str) -> dict | None:
     """Do 4º campo do `/proc/loadavg` (ex.: "1/234") -> rodando e total.
 
     O `/proc/loadavg` termina com "rodando/total" de tarefas escalonáveis. É o
     jeito mais barato de saber quantos processos existem e quantos disputam a
     CPU agora, sem varrer o `/proc` inteiro.
     """
-    partes = raw_loadavg.split()
+    partes = rawLoadavg.split()
     if len(partes) < 4 or "/" not in partes[3]:
         return None
     rodando, _, total = partes[3].partition("/")
@@ -132,7 +132,7 @@ def parse_processos(raw_loadavg: str) -> dict | None:
     return {"rodando": int(rodando), "total": int(total)}
 
 
-def parse_freq_khz(raw: str) -> int | None:
+def parseFreqKhz(raw: str) -> int | None:
     """`scaling_cur_freq` (kHz) -> MHz inteiro. "1500000\\n" -> 1500."""
     raw = raw.strip()
     if not raw.isdigit():
@@ -140,7 +140,7 @@ def parse_freq_khz(raw: str) -> int | None:
     return round(int(raw) / 1000)
 
 
-def parse_volts(raw: str) -> float | None:
+def parseVolts(raw: str) -> float | None:
     """`vcgencmd measure_volts` -> volts. "volt=0.8563V" -> 0.856."""
     raw = raw.strip()
     if "=" in raw:
@@ -152,7 +152,7 @@ def parse_volts(raw: str) -> float | None:
         return None
 
 
-def parse_rede(raw: str, ignorar: tuple[str, ...] = ("lo",)) -> dict | None:
+def parseRede(raw: str, ignorar: tuple[str, ...] = ("lo",)) -> dict | None:
     """`/proc/net/dev` -> bytes recebidos/enviados por interface, em MB.
 
     São contadores acumulados desde o boot (não taxa): servem para ver quanto o
@@ -183,7 +183,7 @@ def parse_rede(raw: str, ignorar: tuple[str, ...] = ("lo",)) -> dict | None:
     return interfaces or None
 
 
-def parse_uptime(raw: str) -> float | None:
+def parseUptime(raw: str) -> float | None:
     """`/proc/uptime` -> segundos ligado (primeiro campo)."""
     partes = raw.split()
     if not partes:
@@ -194,23 +194,23 @@ def parse_uptime(raw: str) -> float | None:
         return None
 
 
-def uso_disco(total_bytes: int, livre_bytes: int) -> dict | None:
+def usoDisco(totalBytes: int, livreBytes: int) -> dict | None:
     """Uso do disco a partir do total e do livre (de `os.statvfs`).
 
     Recebe números, não um caminho, para ser testável — quem chama o
     `statvfs` de verdade é o `main.py`.
     """
-    if total_bytes <= 0:
+    if totalBytes <= 0:
         return None
-    usado = total_bytes - livre_bytes
+    usado = totalBytes - livreBytes
     return {
-        "total_gb": round(total_bytes / 1024**3, 1),
-        "livre_gb": round(livre_bytes / 1024**3, 1),
-        "uso_pct": round(usado / total_bytes * 100, 1),
+        "total_gb": round(totalBytes / 1024**3, 1),
+        "livre_gb": round(livreBytes / 1024**3, 1),
+        "uso_pct": round(usado / totalBytes * 100, 1),
     }
 
 
-def cpu_uso_pct(anterior: tuple[int, int], atual: tuple[int, int]) -> float | None:
+def cpuUsoPct(anterior: tuple[int, int], atual: tuple[int, int]) -> float | None:
     """Uso de CPU entre duas leituras da PRIMEIRA linha de `/proc/stat`.
 
     O `/proc/stat` dá totais acumulados desde o boot; uso instantâneo é a
@@ -220,14 +220,14 @@ def cpu_uso_pct(anterior: tuple[int, int], atual: tuple[int, int]) -> float | No
     """
     ocup0, tot0 = anterior
     ocup1, tot1 = atual
-    d_total = tot1 - tot0
-    if d_total <= 0:
+    dTotal = tot1 - tot0
+    if dTotal <= 0:
         return None
-    d_ocupado = ocup1 - ocup0
-    return round(max(0.0, min(100.0, d_ocupado / d_total * 100)), 1)
+    dOcupado = ocup1 - ocup0
+    return round(max(0.0, min(100.0, dOcupado / dTotal * 100)), 1)
 
 
-def _ocupado_total_de_linha(linha: str) -> tuple[int, int] | None:
+def ocupadoTotalDeLinha(linha: str) -> tuple[int, int] | None:
     """Uma linha "cpu..." do `/proc/stat` -> (ocupado, total) em jiffies.
 
     Os campos são user, nice, system, idle, iowait, irq, softirq, steal... O
@@ -245,7 +245,7 @@ def _ocupado_total_de_linha(linha: str) -> tuple[int, int] | None:
     return total - idle, total
 
 
-def total_e_ocupado_do_proc_stat(raw: str) -> tuple[int, int] | None:
+def totalEOcupadoDoProcStat(raw: str) -> tuple[int, int] | None:
     """Primeira linha de `/proc/stat` -> (ocupado, total) agregado em jiffies.
 
     "cpu  123 4 56 789 10 0 2 0 0 0" — a linha "cpu" (sem número) soma todos os
@@ -254,10 +254,10 @@ def total_e_ocupado_do_proc_stat(raw: str) -> tuple[int, int] | None:
     primeira = raw.splitlines()[0] if raw.strip() else ""
     if primeira.split()[:1] != ["cpu"]:
         return None
-    return _ocupado_total_de_linha(primeira)
+    return ocupadoTotalDeLinha(primeira)
 
 
-def nucleos_do_proc_stat(raw: str) -> dict[str, tuple[int, int]]:
+def nucleosDoProcStat(raw: str) -> dict[str, tuple[int, int]]:
     """`/proc/stat` -> {"cpu": (ocup,tot), "cpu0": (...), "cpu1": (...), ...}.
 
     A linha "cpu" é o agregado; "cpu0", "cpu1"... são os núcleos. Devolver tudo
@@ -270,13 +270,13 @@ def nucleos_do_proc_stat(raw: str) -> dict[str, tuple[int, int]]:
         chave = linha.split()[:1]
         if not chave or not chave[0].startswith("cpu"):
             continue
-        ot = _ocupado_total_de_linha(linha)
+        ot = ocupadoTotalDeLinha(linha)
         if ot is not None:
             leituras[chave[0]] = ot
     return leituras
 
 
-def parse_wireless(raw: str, interface: str = "wlan0") -> dict | None:
+def parseWireless(raw: str, interface: str = "wlan0") -> dict | None:
     """`/proc/net/wireless` -> qualidade e sinal do Wi-Fi da interface.
 
     O arquivo tem duas linhas de cabeçalho e uma por interface:
@@ -296,8 +296,8 @@ def parse_wireless(raw: str, interface: str = "wlan0") -> dict | None:
             return None
         try:
             link = int(float(campos[2].rstrip(".")))
-            sinal_dbm = int(float(campos[3].rstrip(".")))
+            sinalDbm = int(float(campos[3].rstrip(".")))
         except ValueError:
             return None
-        return {"interface": interface, "link": link, "sinal_dbm": sinal_dbm}
+        return {"interface": interface, "link": link, "sinal_dbm": sinalDbm}
     return None

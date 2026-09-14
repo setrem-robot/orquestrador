@@ -87,9 +87,9 @@ class Bateria:
     def __init__(self, inicial: float = 97.0) -> None:
         self.percentual = inicial
 
-    def proxima(self, instante: datetime, passo_s: float) -> dict:
+    def proxima(self, instante: datetime, passoS: float) -> dict:
         # ~4% por hora andando; a variação é o ruído normal de um medidor.
-        self.percentual -= (4.0 * passo_s / 3600) + random.uniform(-0.05, 0.05)
+        self.percentual -= (4.0 * passoS / 3600) + random.uniform(-0.05, 0.05)
         if self.percentual < 22:
             self.percentual = 97.0  # alguém plugou
         percentual = round(max(0.0, min(100.0, self.percentual)), 1)
@@ -143,20 +143,20 @@ def historico(horas: float, fim: datetime | None = None):
     fim = fim or datetime.now(tz=timezone.utc)
     inicio = fim - timedelta(hours=horas)
 
-    def instantes(passo_s: int):
-        total = max(1, int(horas * 3600 / passo_s))
+    def instantes(passoS: int):
+        total = max(1, int(horas * 3600 / passoS))
         for indice in range(total):
-            yield indice, total, inicio + timedelta(seconds=indice * passo_s)
+            yield indice, total, inicio + timedelta(seconds=indice * passoS)
 
     for indice, total, instante in instantes(5):
         yield instante, "gps", TOPICOS["gps"], gps(indice, total, instante)
 
     carga = Bateria()
-    for _indice, _total, instante in instantes(60):
+    for indice, total, instante in instantes(60):
         yield instante, "bateria", TOPICOS["bateria"], carga.proxima(instante, 60)
 
-    for indice, _total, instante in instantes(10):
+    for indice, total, instante in instantes(10):
         yield instante, "motores", TOPICOS["motores"], motores(indice, instante)
 
-    for indice, _total, instante in instantes(60):
+    for indice, total, instante in instantes(60):
         yield instante, "wifi", TOPICOS["wifi"], wifi(indice, instante)

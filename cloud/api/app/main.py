@@ -47,17 +47,17 @@ banco = Banco()
 
 #: Teto por IP. Generoso para o app (que atualiza a cada poucos segundos) e
 #: apertado o bastante para uma aba esquecida não derrubar a VM.
-limitador = seguranca.Limitador(teto=120, janela_s=60.0)
+limitador = seguranca.Limitador(teto=120, janelaS=60.0)
 
 #: A resposta do resumo público, guardada por alguns segundos. Ver
 #: `resumo_publico` e `seguranca.CACHE_RESUMO_S`.
-_cache_resumo = seguranca.CacheCurto(seguranca.CACHE_RESUMO_S)
+cacheResumo = seguranca.CacheCurto(seguranca.CACHE_RESUMO_S)
 
 
 @asynccontextmanager
-async def ciclo_de_vida(_: FastAPI):
+async def cicloDeVida(_: FastAPI):
     banco.abrir()
-    if not seguranca.token_configurado():
+    if not seguranca.tokenConfigurado():
         # Aviso gritado no arranque: sem token, as rotas do app recusam todo
         # mundo, e o sintoma (401 em tudo) não diz onde está o problema.
         logger.error("API_TOKEN vazio: as rotas do app vão recusar todas as requisições")
@@ -69,7 +69,7 @@ app = FastAPI(
     title="Atlas — telemetria",
     description="Leitura do histórico do robô Atlas (Engenharia de Computação, Setrem).",
     version="1.0.0",
-    lifespan=ciclo_de_vida,
+    lifespan=cicloDeVida,
 )
 
 
@@ -97,17 +97,17 @@ _CABECALHOS_SEGURANCA = {
 
 
 @app.middleware("http")
-async def cabecalhos_de_seguranca(request: Request, call_next):
-    resposta = await call_next(request)
+async def cabecalhosDeSeguranca(request: Request, callNext):
+    resposta = await callNext(request)
     for chave, valor in _CABECALHOS_SEGURANCA.items():
         resposta.headers.setdefault(chave, valor)
     return resposta
 
-_origens = [o.strip() for o in os.environ.get("CORS_ORIGENS", "").split(",") if o.strip()]
-if _origens:
+origens = [o.strip() for o in os.environ.get("CORS_ORIGENS", "").split(",") if o.strip()]
+if origens:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_origens,
+        allow_origins=origens,
         # Só leitura: nenhuma rota daqui muda nada, então nem GET precisa de
         # credencial de navegador. Manter fechado evita que uma página de
         # terceiros use o cookie de alguém para falar com a API.
@@ -120,7 +120,7 @@ if _origens:
 # ---------------------------------------------------------------------------
 # Porteiros
 # ---------------------------------------------------------------------------
-def _cliente(request: Request) -> str:
+def cliente(request: Request) -> str:
     """Quem está pedindo, para o limitador.
 
     Atrás do túnel da Cloudflare o IP da conexão é sempre o do `cloudflared`,
@@ -138,19 +138,19 @@ def _cliente(request: Request) -> str:
     return request.client.host if request.client else "desconhecido"
 
 
-async def exige_token(
+async def exigeToken(
     request: Request, authorization: str | None = Header(default=None)
 ) -> None:
-    if not limitador.permitir(_cliente(request)):
+    if not limitador.permitir(cliente(request)):
         raise HTTPException(status_code=429, detail="requisições demais; tente em um minuto")
-    if not seguranca.token_confere(authorization):
+    if not seguranca.tokenConfere(authorization):
         raise HTTPException(status_code=401, detail="token ausente ou inválido")
 
 
-async def porta_publica(request: Request) -> None:
+async def portaPublica(request: Request) -> None:
     if not seguranca.PUBLICO_HABILITADO:
         raise HTTPException(status_code=404, detail="rotas públicas desligadas")
-    if not limitador.permitir(_cliente(request)):
+    if not limitador.permitir(cliente(request)):
         raise HTTPException(status_code=429, detail="requisições demais; tente em um minuto")
 
 
@@ -163,22 +163,22 @@ async def saude() -> JSONResponse:
 
     Não conta nada sobre o robô — só se esta API consegue falar com o banco.
     """
-    de_pe, erro = banco.esta_de_pe()
+    dePe, erro = banco.estaDePe()
     corpo: dict[str, Any] = {
-        "ok": de_pe,
-        "banco": de_pe,
-        "token_configurado": seguranca.token_configurado(),
+        "ok": dePe,
+        "banco": dePe,
+        "token_configurado": seguranca.tokenConfigurado(),
         "publico": seguranca.PUBLICO_HABILITADO,
     }
     if erro:
         corpo["erro"] = erro
-    return JSONResponse(corpo, status_code=200 if de_pe else 503)
+    return JSONResponse(corpo, status_code=200 if dePe else 503)
 
 
 # ---------------------------------------------------------------------------
 # Rotas do app
 # ---------------------------------------------------------------------------
-@app.get("/v1/estado", tags=["app"], dependencies=[Depends(exige_token)])
+@app.get("/v1/estado", tags=["app"], dependencies=[Depends(exigeToken)])
 async def estado() -> dict:
     """O último valor de cada tipo de telemetria — o painel do app.
 
@@ -186,20 +186,20 @@ async def estado() -> dict:
     a mesma cara para um dado de agora e para um de anteontem, que é
     exatamente o erro que faz alguém confiar num robô desligado.
     """
-    linhas = banco.consultar(*consultas.estado_atual())
+    linhas = banco.consultar(*consultas.estadoAtual())
     agora = consultas.agora()
     itens = {
         tipo: {
-            "ts": _iso(ts),
+            "ts": iso(ts),
             "idade_s": round((agora - ts).total_seconds(), 1),
             "dados": payload,
         }
         for tipo, ts, payload in linhas
     }
-    return {"gerado_em": _iso(agora), "itens": itens}
+    return {"gerado_em": iso(agora), "itens": itens}
 
 
-@app.get("/v1/trajeto", tags=["app"], dependencies=[Depends(exige_token)])
+@app.get("/v1/trajeto", tags=["app"], dependencies=[Depends(exigeToken)])
 async def trajeto(
     desde: datetime | None = None,
     ate: datetime | None = None,
@@ -207,11 +207,11 @@ async def trajeto(
 ) -> dict:
     """Os pontos do percurso, para desenhar a linha no mapa."""
     linhas = banco.consultar(*consultas.trajeto(desde, ate, limite))
-    pontos = [_ponto(ts, payload) for ts, payload in linhas]
+    pontos = [montarPonto(ts, payload) for ts, payload in linhas]
     return {"pontos": pontos, "total": len(pontos)}
 
 
-@app.get("/v1/serie/{tipo}", tags=["app"], dependencies=[Depends(exige_token)])
+@app.get("/v1/serie/{tipo}", tags=["app"], dependencies=[Depends(exigeToken)])
 async def serie(
     tipo: str,
     campo: str = Query(
@@ -225,7 +225,7 @@ async def serie(
     if intervalo not in consultas.INTERVALOS:
         opcoes = ", ".join(consultas.INTERVALOS)
         raise HTTPException(status_code=400, detail=f"intervalo inválido (use: {opcoes})")
-    if not consultas.campo_valido(campo):
+    if not consultas.campoValido(campo):
         raise HTTPException(status_code=400, detail="nome de campo inválido")
 
     linhas = banco.consultar(*consultas.serie(tipo, campo, desde, ate, intervalo))
@@ -234,23 +234,23 @@ async def serie(
         "campo": campo,
         "intervalo": intervalo,
         "pontos": [
-            {"ts": _iso(instante), "valor": valor, "amostras": amostras}
+            {"ts": iso(instante), "valor": valor, "amostras": amostras}
             for instante, valor, amostras in linhas
             if valor is not None
         ],
     }
 
 
-@app.get("/v1/eventos", tags=["app"], dependencies=[Depends(exige_token)])
+@app.get("/v1/eventos", tags=["app"], dependencies=[Depends(exigeToken)])
 async def eventos(
     tipo: str | None = None,
     limite: int | None = Query(default=None, ge=1),
-    antes_de: datetime | None = Query(default=None, description="paginação: ts da última linha"),
+    antesDe: datetime | None = Query(default=None, description="paginação: ts da última linha"),
 ) -> dict:
     """As mensagens como chegaram. Feio, e é o que salva uma depuração em campo."""
-    linhas = banco.consultar(*consultas.eventos(tipo, limite, antes_de))
+    linhas = banco.consultar(*consultas.eventos(tipo, limite, antesDe))
     registros = [
-        {"ts": _iso(ts), "tipo": t, "topico": topico, "dados": payload}
+        {"ts": iso(ts), "tipo": t, "topico": topico, "dados": payload}
         for ts, t, topico, payload in linhas
     ]
     return {
@@ -264,8 +264,8 @@ async def eventos(
 # ---------------------------------------------------------------------------
 # Rotas da landing page (sem token, e servindo menos)
 # ---------------------------------------------------------------------------
-@app.get("/v1/publico/resumo", tags=["público"], dependencies=[Depends(porta_publica)])
-async def resumo_publico() -> dict:
+@app.get("/v1/publico/resumo", tags=["público"], dependencies=[Depends(portaPublica)])
+async def resumoPublico() -> dict:
     """Quantas mensagens de cada tipo, e quando foi a última.
 
     Mostra que o robô existe e está vivo sem contar onde ele está.
@@ -276,30 +276,30 @@ async def resumo_publico() -> dict:
     com o histórico e com o número de pessoas com a página aberta ao mesmo
     tempo; com ele, é uma consulta por minuto e pronto.
     """
-    guardado = _cache_resumo.obter()
+    guardado = cacheResumo.obter()
     if guardado is not None:
         return guardado
 
     linhas = banco.consultar(*consultas.resumo())
     agora = consultas.agora()
     resposta = {
-        "gerado_em": _iso(agora),
+        "gerado_em": iso(agora),
         "tipos": [
             {
                 "tipo": tipo,
                 "total": total,
-                "ultima": _iso(ultima),
+                "ultima": iso(ultima),
                 "idade_s": round((agora - ultima).total_seconds(), 1) if ultima else None,
             }
             for tipo, total, ultima in linhas
         ],
     }
-    _cache_resumo.guardar(resposta)
+    cacheResumo.guardar(resposta)
     return resposta
 
 
-@app.get("/v1/publico/trajeto", tags=["público"], dependencies=[Depends(porta_publica)])
-async def trajeto_publico(limite: int | None = Query(default=200, ge=1, le=500)) -> dict:
+@app.get("/v1/publico/trajeto", tags=["público"], dependencies=[Depends(portaPublica)])
+async def trajetoPublico(limite: int | None = Query(default=200, ge=1, le=500)) -> dict:
     """O percurso recente, com a precisão reduzida.
 
     ~11 metros de resolução: dá para ver o robô andando pelo campus, e não dá
@@ -308,9 +308,9 @@ async def trajeto_publico(limite: int | None = Query(default=200, ge=1, le=500))
     linhas = banco.consultar(*consultas.trajeto(None, None, limite))
     pontos = []
     for ts, payload in linhas:
-        ponto = _ponto(ts, payload)
-        ponto["lat"] = seguranca.arredondar_coordenada(ponto["lat"])
-        ponto["lon"] = seguranca.arredondar_coordenada(ponto["lon"])
+        ponto = montarPonto(ts, payload)
+        ponto["lat"] = seguranca.arredondarCoordenada(ponto["lat"])
+        ponto["lon"] = seguranca.arredondarCoordenada(ponto["lon"])
         # Contagem de satélites e velocidade não dizem onde o robô está, mas
         # também não interessam a quem só está vendo a página: fora.
         ponto.pop("satelites", None)
@@ -318,8 +318,8 @@ async def trajeto_publico(limite: int | None = Query(default=200, ge=1, le=500))
     return {"pontos": pontos, "total": len(pontos), "precisao_casas": seguranca.PRECISAO_GPS_PUBLICA}
 
 
-@app.get("/v1/publico/saude", tags=["público"], dependencies=[Depends(porta_publica)])
-async def saude_publica() -> dict:
+@app.get("/v1/publico/saude", tags=["público"], dependencies=[Depends(portaPublica)])
+async def saudePublica() -> dict:
     """A saúde do Pi mais recente — temperatura, CPU, memória, disco, rede.
 
     Servida sem token porque nada aqui diz onde o robô está nem é segredo (ao
@@ -327,37 +327,37 @@ async def saude_publica() -> dict:
     "45 °C" com a mesma cara para um dado de agora e para um de ontem — o mesmo
     cuidado de `/v1/estado`. Sem nenhuma leitura ainda, `dados` é `null`.
     """
-    linhas = banco.consultar(*consultas.saude_sistema())
+    linhas = banco.consultar(*consultas.saudeSistema())
     agora = consultas.agora()
     if not linhas:
-        return {"gerado_em": _iso(agora), "ts": None, "idade_s": None, "dados": None}
+        return {"gerado_em": iso(agora), "ts": None, "idade_s": None, "dados": None}
     ts, payload = linhas[0]
     return {
-        "gerado_em": _iso(agora),
-        "ts": _iso(ts),
+        "gerado_em": iso(agora),
+        "ts": iso(ts),
         "idade_s": round((agora - ts).total_seconds(), 1),
         "dados": payload,
     }
 
 
 # ---------------------------------------------------------------------------
-def _iso(momento: datetime | None) -> str | None:
+def iso(momento: datetime | None) -> str | None:
     """Instante em ISO 8601 com fuso — o formato que `DateTime.parse` do Dart lê."""
     return momento.isoformat() if momento else None
 
 
-def _ponto(ts: datetime, payload: dict) -> dict:
+def montarPonto(ts: datetime, payload: dict) -> dict:
     """Uma leitura de GPS no formato que o mapa espera."""
     return {
-        "ts": _iso(ts),
-        "lat": _numero(payload.get("lat")),
-        "lon": _numero(payload.get("lon")),
-        "velocidade_kmh": _numero(payload.get("velocidade_kmh")),
+        "ts": iso(ts),
+        "lat": numero(payload.get("lat")),
+        "lon": numero(payload.get("lon")),
+        "velocidade_kmh": numero(payload.get("velocidade_kmh")),
         "satelites": payload.get("satelites"),
     }
 
 
-def _numero(valor: Any) -> float | None:
+def numero(valor: Any) -> float | None:
     """Converte com tolerância: o payload é JSON livre e pode trazer texto."""
     try:
         return float(valor)

@@ -69,33 +69,33 @@ class Banco:
     """
 
     def __init__(self, conninfo: str = CONNINFO) -> None:
-        self._pool = ConnectionPool(
+        self.pool = ConnectionPool(
             conninfo,
             min_size=POOL_MIN,
             max_size=POOL_MAX,
             open=False,
             kwargs={"autocommit": True},
         )
-        self._aberto = False
+        self.aberto = False
 
     def abrir(self) -> None:
-        if self._aberto:
+        if self.aberto:
             return
         # `wait=False`: se o banco ainda não subiu, as primeiras requisições
         # falham com uma mensagem clara em vez de o arranque inteiro travar.
-        self._pool.open(wait=False)
-        self._aberto = True
+        self.pool.open(wait=False)
+        self.aberto = True
 
     def fechar(self) -> None:
-        if self._aberto:
-            self._pool.close()
-            self._aberto = False
+        if self.aberto:
+            self.pool.close()
+            self.aberto = False
 
     @contextmanager
     def cursor(self) -> Iterator[Any]:
         # O `statement_timeout` vem do `CONNINFO`, e não de um `SET` aqui —
         # ver o comentário lá em cima sobre por que `SET LOCAL` não valia.
-        with self._pool.connection(timeout=5.0) as conexao:
+        with self.pool.connection(timeout=5.0) as conexao:
             with conexao.cursor() as cur:
                 yield cur
 
@@ -105,7 +105,7 @@ class Banco:
             cur.execute(sql, parametros)
             return cur.fetchall()
 
-    def esta_de_pe(self) -> tuple[bool, str]:
+    def estaDePe(self) -> tuple[bool, str]:
         """Se dá para falar com o banco agora. Usado por `/saude`."""
         try:
             with self.cursor() as cur:

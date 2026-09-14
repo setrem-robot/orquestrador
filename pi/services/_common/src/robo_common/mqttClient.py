@@ -9,7 +9,7 @@ Encapsula o paho-mqtt (API 2.x) com o que todo serviço precisa:
 
 Uso típico:
 
-    from robo_common.mqtt_client import MqttService
+    from robo_common.mqttClient import MqttService
     from robo_common import topics
 
     svc = MqttService(client_id="meu_servico",
@@ -38,44 +38,44 @@ MessageHandler = Callable[[str, dict[str, Any]], None]
 class MqttService:
     def __init__(
         self,
-        client_id: str,
+        clientId: str,
         host: str = "127.0.0.1",
         port: int = 1883,
         username: str | None = None,
         password: str | None = None,
-        heartbeat_topic: str | None = None,
+        heartbeatTopic: str | None = None,
     ) -> None:
-        self._client_id = client_id
-        self._host = host
-        self._port = port
-        self._heartbeat_topic = heartbeat_topic
-        self._handlers: dict[str, MessageHandler] = {}
+        self.clientId = clientId
+        self.host = host
+        self.port = port
+        self.heartbeatTopic = heartbeatTopic
+        self.handlers: dict[str, MessageHandler] = {}
 
-        self._client = mqtt.Client(
+        self.client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
-            client_id=client_id,
+            clientId=clientId,
             clean_session=True,
         )
         if username:
-            self._client.username_pw_set(username, password)
+            self.client.username_pw_set(username, password)
 
         # Reconexão automática: o loop do paho tenta reconectar sozinho,
         # com espera crescente entre 1s e 30s.
-        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
 
         # Last Will: registrado no broker no momento da conexão. Se este
         # processo cair sem chamar stop(), o broker publica "offline" por ele.
-        if heartbeat_topic:
-            self._client.will_set(
-                heartbeat_topic,
-                payload=json.dumps({"servico": client_id, "status": "offline"}),
+        if heartbeatTopic:
+            self.client.will_set(
+                heartbeatTopic,
+                payload=json.dumps({"servico": clientId, "status": "offline"}),
                 qos=1,
                 retain=True,
             )
 
-        self._client.on_connect = self._on_connect
-        self._client.on_message = self._on_message
-        self._client.on_disconnect = self._on_disconnect
+        self.client.on_connect = self.onConnect
+        self.client.on_message = self.onMessage
+        self.client.on_disconnect = self.onDisconnect
 
     # ------------------------------------------------------------------
     # API pública
@@ -86,74 +86,74 @@ class MqttService:
         Deve ser chamado ANTES de start(); a inscrição efetiva acontece no
         on_connect, e é refeita a cada reconexão.
         """
-        self._handlers[topic] = handler
+        self.handlers[topic] = handler
 
     def start(self) -> None:
-        logger.info("Conectando ao broker MQTT em %s:%s ...", self._host, self._port)
-        self._client.connect(self._host, self._port, keepalive=30)
+        logger.info("Conectando ao broker MQTT em %s:%s ...", self.host, self.port)
+        self.client.connect(self.host, self.port, keepalive=30)
         # loop_start() roda a rede do MQTT numa thread separada, então o
         # serviço fica livre para fazer seu trabalho (ler serial, GPS, etc.).
-        self._client.loop_start()
+        self.client.loop_start()
 
     def stop(self) -> None:
-        if self._heartbeat_topic:
+        if self.heartbeatTopic:
             # Aviso "limpo" de saída (substitui o LWT em desligamento normal).
-            self.publish_json(
-                self._heartbeat_topic,
-                {"servico": self._client_id, "status": "offline"},
+            self.publishJson(
+                self.heartbeatTopic,
+                {"servico": self.clientId, "status": "offline"},
                 qos=1,
                 retain=True,
             )
-        self._client.loop_stop()
-        self._client.disconnect()
+        self.client.loop_stop()
+        self.client.disconnect()
         logger.info("Desconectado do broker MQTT.")
 
-    def publish_json(
+    def publishJson(
         self,
         topic: str,
         payload: dict[str, Any],
         qos: int = 0,
         retain: bool = False,
     ) -> None:
-        self._client.publish(topic, json.dumps(payload), qos=qos, retain=retain)
+        self.client.publish(topic, json.dumps(payload), qos=qos, retain=retain)
 
     # ------------------------------------------------------------------
     # Callbacks internos (paho 2.x)
     # ------------------------------------------------------------------
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
-        if reason_code != 0:
-            logger.error("Falha ao conectar no broker (rc=%s).", reason_code)
+    def onConnect(self, client, userdata, flags, reasonCode, properties):
+        if reasonCode != 0:
+            logger.error("Falha ao conectar no broker (rc=%s).", reasonCode)
             return
         logger.info("Conectado ao broker MQTT.")
 
         # Re-inscreve em tudo. Isto é ESSENCIAL após uma reconexão: as
         # inscrições anteriores foram perdidas quando a conexão caiu.
-        for topic in self._handlers:
+        for topic in self.handlers:
             client.subscribe(topic, qos=1)
             logger.debug("Inscrito em %s", topic)
 
-        if self._heartbeat_topic:
-            self.publish_json(
-                self._heartbeat_topic,
-                {"servico": self._client_id, "status": "online"},
+        if self.heartbeatTopic:
+            self.publishJson(
+                self.heartbeatTopic,
+                {"servico": self.clientId, "status": "online"},
                 qos=1,
                 retain=True,
             )
 
-    def _on_disconnect(self, client, userdata, flags, reason_code, properties):
+    def onDisconnect(self, client, userdata, flags, reasonCode, properties):
         logger.warning(
             "Desconectado do broker (rc=%s). Reconexão automática em andamento...",
-            reason_code,
+            reasonCode,
         )
 
-    def _on_message(self, client, userdata, message):
+    def onMessage(self, client, userdata, message):
         try:
             payload = json.loads(message.payload.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
             logger.warning("Mensagem ignorada (JSON inválido) em %s.", message.topic)
             return
 
-        handler = self._match_handler(message.topic)
+        handler = self.matchHandler(message.topic)
         if handler is None:
             return
         try:
@@ -161,12 +161,12 @@ class MqttService:
         except Exception:  # um handler com bug não pode derrubar o serviço
             logger.exception("Erro no handler do tópico %s.", message.topic)
 
-    def _match_handler(self, topic: str) -> MessageHandler | None:
+    def matchHandler(self, topic: str) -> MessageHandler | None:
         # Match exato primeiro (caso mais comum e mais barato).
-        if topic in self._handlers:
-            return self._handlers[topic]
+        if topic in self.handlers:
+            return self.handlers[topic]
         # Depois, match por filtro (tópicos com + ou #).
-        for filtro, handler in self._handlers.items():
+        for filtro, handler in self.handlers.items():
             if mqtt.topic_matches_sub(filtro, topic):
                 return handler
         return None

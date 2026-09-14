@@ -30,7 +30,7 @@ import pynmea2
 import serial  # pyserial
 
 from robo_common import topics
-from robo_common.mqtt_client import MqttService
+from robo_common.mqttClient import MqttService
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -47,22 +47,22 @@ MQTT_HOST = os.environ.get("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 HEARTBEAT_INTERVALO_S = float(os.environ.get("HEARTBEAT_INTERVALO_S", "10"))
 
-_parar = False
+parar = False
 
 
-def _tratar_sinal(signum, _frame) -> None:
-    global _parar
+def tratarSinal(signum, frame) -> None:
+    global parar
     logger.info("Sinal %s recebido; encerrando com elegância...", signum)
-    _parar = True
+    parar = True
 
 
-def abrir_serial() -> serial.Serial:
+def abrirSerial() -> serial.Serial:
     """Abre a serial do GPS, reabrindo até conseguir.
 
     O timeout de 1s faz o readline() retornar periodicamente, mantendo o loop
     responsivo a heartbeat e à flag de parada mesmo sem sinal do GPS.
     """
-    while not _parar:
+    while not parar:
         try:
             ser = serial.Serial(GPS_PORT, GPS_BAUD, timeout=1.0)
             logger.info("Serial do GPS aberta em %s @ %d baud.", GPS_PORT, GPS_BAUD)
@@ -88,8 +88,8 @@ class Posicao:
         self.lon: float | None = None
         self.fix: bool = False
         self.satelites: int | None = None
-        self.altitude_m: float | None = None
-        self.velocidade_kmh: float | None = None
+        self.altitudeM: float | None = None
+        self.velocidadeKmh: float | None = None
         self.rumo: float | None = None
 
     def atualizar(self, msg: pynmea2.NMEASentence) -> None:
@@ -103,7 +103,7 @@ class Posicao:
                 self.lat = float(msg.latitude)
                 self.lon = float(msg.longitude)
                 if msg.altitude is not None:
-                    self.altitude_m = float(msg.altitude)
+                    self.altitudeM = float(msg.altitude)
 
         # RMC: status de validade + velocidade (nós) + rumo.
         elif isinstance(msg, pynmea2.types.talker.RMC):
@@ -113,54 +113,54 @@ class Posicao:
                 self.lon = float(msg.longitude)
             if msg.spd_over_grnd is not None:
                 # NMEA dá velocidade em nós; convertemos para km/h.
-                self.velocidade_kmh = round(float(msg.spd_over_grnd) * 1.852, 2)
+                self.velocidadeKmh = round(float(msg.spd_over_grnd) * 1.852, 2)
             if msg.true_course is not None:
                 self.rumo = float(msg.true_course)
 
-    def tem_posicao(self) -> bool:
+    def temPosicao(self) -> bool:
         return self.fix and self.lat is not None and self.lon is not None
 
-    def como_payload(self) -> dict:
+    def comoPayload(self) -> dict:
         return {
             "lat": self.lat,
             "lon": self.lon,
             "fix": self.fix,
             "satelites": self.satelites,
-            "altitude_m": self.altitude_m,
-            "velocidade_kmh": self.velocidade_kmh,
+            "altitude_m": self.altitudeM,
+            "velocidade_kmh": self.velocidadeKmh,
             "rumo": self.rumo,
             "ts": time.time(),
         }
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, _tratar_sinal)
-    signal.signal(signal.SIGTERM, _tratar_sinal)
+    signal.signal(signal.SIGINT, tratarSinal)
+    signal.signal(signal.SIGTERM, tratarSinal)
 
-    mqtt_svc = MqttService(
-        client_id=SERVICO,
+    mqttSvc = MqttService(
+        clientId=SERVICO,
         host=MQTT_HOST,
         port=MQTT_PORT,
-        heartbeat_topic=topics.heartbeat(SERVICO),
+        heartbeatTopic=topics.heartbeat(SERVICO),
     )
-    mqtt_svc.start()
+    mqttSvc.start()
 
-    ser = abrir_serial()
+    ser = abrirSerial()
     posicao = Posicao()
-    proximo_heartbeat = 0.0
-    proxima_publicacao = 0.0
+    proximoHeartbeat = 0.0
+    proximaPublicacao = 0.0
 
     try:
-        while not _parar:
+        while not parar:
             agora = time.monotonic()
-            if agora >= proximo_heartbeat:
-                mqtt_svc.publish_json(
+            if agora >= proximoHeartbeat:
+                mqttSvc.publishJson(
                     topics.heartbeat(SERVICO),
                     {"servico": SERVICO, "status": "online", "ts": time.time()},
                     qos=0,
                     retain=True,
                 )
-                proximo_heartbeat = agora + HEARTBEAT_INTERVALO_S
+                proximoHeartbeat = agora + HEARTBEAT_INTERVALO_S
 
             try:
                 raw = ser.readline()  # b"" no timeout (1s)
@@ -170,7 +170,7 @@ def main() -> None:
                     ser.close()
                 except Exception:
                     pass
-                ser = abrir_serial()
+                ser = abrirSerial()
                 continue
 
             if not raw:
@@ -193,21 +193,21 @@ def main() -> None:
 
             # Publica no máximo a cada GPS_INTERVALO_S, e só com fix válido.
             agora = time.monotonic()
-            if posicao.tem_posicao() and agora >= proxima_publicacao:
-                payload = posicao.como_payload()
-                mqtt_svc.publish_json(topics.GPS_POSICAO, payload, qos=1, retain=True)
+            if posicao.temPosicao() and agora >= proximaPublicacao:
+                payload = posicao.comoPayload()
+                mqttSvc.publishJson(topics.GPS_POSICAO, payload, qos=1, retain=True)
                 logger.info(
                     "Posição: lat=%.6f lon=%.6f sats=%s v=%s km/h",
                     payload["lat"], payload["lon"],
                     payload["satelites"], payload["velocidade_kmh"],
                 )
-                proxima_publicacao = agora + GPS_INTERVALO_S
+                proximaPublicacao = agora + GPS_INTERVALO_S
     finally:
         try:
             ser.close()
         except Exception:
             pass
-        mqtt_svc.stop()
+        mqttSvc.stop()
 
 
 if __name__ == "__main__":

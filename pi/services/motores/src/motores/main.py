@@ -37,10 +37,10 @@ import time
 from typing import Any
 
 from robo_common import topics
-from robo_common.mqtt_client import MqttService
+from robo_common.mqttClient import MqttService
 
-from .acionamento import Acionamento, criar_acionamento
-from .cinematica import ACOES_VALIDAS, Rampa, Velocidades, do_comando
+from .acionamento import Acionamento, criarAcionamento
+from .cinematica import ACOES_VALIDAS, Rampa, Velocidades, doComando
 from .vigia import Vigia
 
 logging.basicConfig(
@@ -50,7 +50,7 @@ logging.basicConfig(
 logger = logging.getLogger("motores")
 
 
-def _booleano(*nomes: str, padrao: str = "false") -> bool:
+def booleano(*nomes: str, padrao: str = "false") -> bool:
     """Primeiro nome definido no ambiente vence.
 
     Os nomes antigos (MOTOR1/MOTOR2) continuam valendo: quem já tem a unidade
@@ -69,8 +69,8 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 HEARTBEAT_INTERVALO_S = float(os.environ.get("HEARTBEAT_INTERVALO_S", "10"))
 VELOCIDADE_PADRAO = int(os.environ.get("VELOCIDADE_PADRAO", "60"))
 BACKEND = os.environ.get("MOTORES_BACKEND", "auto")
-ESQ_INVERTIDO = _booleano("MOTOR_ESQ_INVERTIDO", "MOTOR1_INVERTIDO")
-DIR_INVERTIDO = _booleano("MOTOR_DIR_INVERTIDO", "MOTOR2_INVERTIDO")
+ESQ_INVERTIDO = booleano("MOTOR_ESQ_INVERTIDO", "MOTOR1_INVERTIDO")
+DIR_INVERTIDO = booleano("MOTOR_DIR_INVERTIDO", "MOTOR2_INVERTIDO")
 ACELERACAO = float(os.environ.get("ACELERACAO", "3.0"))
 #: Quanto tempo de silêncio, no meio de um movimento, significa "pare". O app
 #: repete o comando a cada 300 ms enquanto o dedo está no botão, então 1 s dá
@@ -82,13 +82,13 @@ COMANDO_TIMEOUT_S = float(os.environ.get("COMANDO_TIMEOUT_S", "1.0"))
 #: de segundo e continuam custando quase nada de CPU.
 TICK_S = 0.05
 
-_parar = False
+parar = False
 
 
-def _tratar_sinal(signum, _frame) -> None:
-    global _parar
+def tratarSinal(signum, frame) -> None:
+    global parar
     logger.info("Sinal %s recebido; encerrando com elegância...", signum)
-    _parar = True
+    parar = True
 
 
 class ServicoMotores:
@@ -115,37 +115,37 @@ class ServicoMotores:
         vigia: Vigia,
         *,
         aceleracao: float = ACELERACAO,
-        velocidade_padrao: int = VELOCIDADE_PADRAO,
-        timeout_s: float = COMANDO_TIMEOUT_S,
-        publicar_status=None,
+        velocidadePadrao: int = VELOCIDADE_PADRAO,
+        timeoutS: float = COMANDO_TIMEOUT_S,
+        publicarStatus=None,
     ) -> None:
-        self._acionamento = acionamento
-        self._vigia = vigia
-        self._rampa = Rampa(aceleracao)
-        self._velocidade_padrao = velocidade_padrao
-        self._timeout_s = timeout_s
-        self._publicar = publicar_status
-        self._ultimo_status: dict[str, Any] | None = None
+        self.acionamento = acionamento
+        self.vigia = vigia
+        self.rampa = Rampa(aceleracao)
+        self.velocidadePadrao = velocidadePadrao
+        self.timeoutS = timeoutS
+        self.publicar = publicarStatus
+        self.ultimoStatus: dict[str, Any] | None = None
         #: Serializa `receber()` (thread do paho) com `tick()` (laço de
         #: `main`). Ver o porquê no docstring da classe.
-        self._cadeado = threading.RLock()
+        self.cadeado = threading.RLock()
 
     # -- entrada -----------------------------------------------------------
     def receber(self, comando: dict[str, Any], agora: float) -> None:
         """Aceita um comando do contrato MQTT e o transforma em alvo."""
-        with self._cadeado:
-            self._receber(comando, agora)
+        with self.cadeado:
+            self.receberInterno(comando, agora)
 
-    def _receber(self, comando: dict[str, Any], agora: float) -> None:
+    def receberInterno(self, comando: dict[str, Any], agora: float) -> None:
         acao = str(comando.get("acao", ""))
         if acao not in ACOES_VALIDAS:
             logger.warning("Ação de motor inválida: '%s'; ignorando.", acao)
             return
 
         try:
-            alvo = do_comando(
+            alvo = doComando(
                 acao,
-                int(comando.get("velocidade", self._velocidade_padrao)),
+                int(comando.get("velocidade", self.velocidadePadrao)),
                 linear=float(comando.get("linear", 0.0)),
                 angular=float(comando.get("angular", 0.0)),
             )
@@ -158,42 +158,42 @@ class ServicoMotores:
         if alvo.parado:
             # Parada pedida é parada agora: quem apertou "parar" não quer ver o
             # robô desacelerando por mais meio segundo.
-            self._vigia.parada_recebida()
-            self._acionamento.aplicar(self._rampa.parar_agora())
+            self.vigia.paradaRecebida()
+            self.acionamento.aplicar(self.rampa.pararAgora())
         else:
-            self._vigia.movimento_recebido(agora)
-            self._rampa.pedir(alvo)
+            self.vigia.movimentoRecebido(agora)
+            self.rampa.pedir(alvo)
 
         logger.info("Comando: %s -> esquerda=%.2f direita=%.2f", acao, alvo.esquerda, alvo.direita)
-        self._anunciar(acao, alvo)
+        self.anunciar(acao, alvo)
 
-    def parada_de_emergencia(self, motivo: str) -> None:
+    def paradaDeEmergencia(self, motivo: str) -> None:
         """Para tudo sem rampa, e conta o porquê."""
-        with self._cadeado:
+        with self.cadeado:
             logger.warning("Parada de emergência: %s", motivo)
-            self._vigia.parada_recebida()
-            self._acionamento.aplicar(self._rampa.parar_agora())
-            self._anunciar("parar", Velocidades(), motivo=motivo)
+            self.vigia.paradaRecebida()
+            self.acionamento.aplicar(self.rampa.pararAgora())
+            self.anunciar("parar", Velocidades(), motivo=motivo)
 
     # -- tempo -------------------------------------------------------------
     def tick(self, dt: float, agora: float) -> None:
         """Uma volta do laço: vigia o silêncio e avança a rampa."""
-        with self._cadeado:
-            if self._vigia.expirou(agora):
-                self.parada_de_emergencia(
-                    f"nenhum comando de movimento há {self._timeout_s:.1f}s — o controle "
+        with self.cadeado:
+            if self.vigia.expirou(agora):
+                self.paradaDeEmergencia(
+                    f"nenhum comando de movimento há {self.timeoutS:.1f}s — o controle "
                     "caiu, ou o app não está repetindo o comando"
                 )
                 return
-            self._acionamento.aplicar(self._rampa.avancar(dt))
+            self.acionamento.aplicar(self.rampa.avancar(dt))
 
     def encerrar(self) -> None:
-        with self._cadeado:
-            self._acionamento.parar()
-            self._acionamento.fechar()
+        with self.cadeado:
+            self.acionamento.parar()
+            self.acionamento.fechar()
 
     # -- saída -------------------------------------------------------------
-    def _anunciar(self, acao: str, alvo: Velocidades, *, motivo: str = "") -> None:
+    def anunciar(self, acao: str, alvo: Velocidades, *, motivo: str = "") -> None:
         status: dict[str, Any] = {
             "acao": acao,
             # Mantido para o app e para a telemetria, que já leem este campo:
@@ -206,39 +206,39 @@ class ServicoMotores:
             status["motivo"] = motivo
         # Repetir o mesmo status a cada comando repetido encheria o tópico
         # retido e a telemetria com a mesma linha três vezes por segundo.
-        if status == self._ultimo_status:
+        if status == self.ultimoStatus:
             return
-        self._ultimo_status = status
-        if self._publicar is not None:
-            self._publicar(status)
+        self.ultimoStatus = status
+        if self.publicar is not None:
+            self.publicar(status)
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, _tratar_sinal)
-    signal.signal(signal.SIGTERM, _tratar_sinal)
+    signal.signal(signal.SIGINT, tratarSinal)
+    signal.signal(signal.SIGTERM, tratarSinal)
 
-    acionamento = criar_acionamento(
-        BACKEND, invertido_esquerda=ESQ_INVERTIDO, invertido_direita=DIR_INVERTIDO
+    acionamento = criarAcionamento(
+        BACKEND, invertidoEsquerda=ESQ_INVERTIDO, invertidoDireita=DIR_INVERTIDO
     )
     vigia = Vigia(COMANDO_TIMEOUT_S)
 
-    mqtt_svc = MqttService(
-        client_id=SERVICO,
+    mqttSvc = MqttService(
+        clientId=SERVICO,
         host=MQTT_HOST,
         port=MQTT_PORT,
-        heartbeat_topic=topics.heartbeat(SERVICO),
+        heartbeatTopic=topics.heartbeat(SERVICO),
     )
 
     def publicar(status: dict[str, Any]) -> None:
-        mqtt_svc.publish_json(topics.MOTORES_STATUS, status, qos=1, retain=True)
+        mqttSvc.publishJson(topics.MOTORES_STATUS, status, qos=1, retain=True)
 
-    servico = ServicoMotores(acionamento, vigia, publicar_status=publicar)
+    servico = ServicoMotores(acionamento, vigia, publicarStatus=publicar)
 
-    mqtt_svc.on(
+    mqttSvc.on(
         topics.MOTORES_COMANDO,
-        lambda _topico, msg: servico.receber(msg, time.monotonic()),
+        lambda topico, msg: servico.receber(msg, time.monotonic()),
     )
-    mqtt_svc.start()
+    mqttSvc.start()
     logger.info("Serviço motores no ar; aguardando comandos em %s.", topics.MOTORES_COMANDO)
     if vigia.ligado:
         logger.info(
@@ -251,26 +251,26 @@ def main() -> None:
             "um movimento, o robô continua andando."
         )
 
-    proximo_heartbeat = 0.0
+    proximoHeartbeat = 0.0
     anterior = time.monotonic()
     try:
-        while not _parar:
+        while not parar:
             agora = time.monotonic()
             servico.tick(agora - anterior, agora)
             anterior = agora
 
-            if agora >= proximo_heartbeat:
-                mqtt_svc.publish_json(
+            if agora >= proximoHeartbeat:
+                mqttSvc.publishJson(
                     topics.heartbeat(SERVICO),
                     {"servico": SERVICO, "status": "online", "ts": time.time()},
                     qos=0,
                     retain=True,
                 )
-                proximo_heartbeat = agora + HEARTBEAT_INTERVALO_S
+                proximoHeartbeat = agora + HEARTBEAT_INTERVALO_S
             time.sleep(TICK_S)
     finally:
         servico.encerrar()
-        mqtt_svc.stop()
+        mqttSvc.stop()
 
 
 if __name__ == "__main__":

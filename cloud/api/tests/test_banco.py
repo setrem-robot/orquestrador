@@ -27,10 +27,10 @@ from app import banco
 
 
 class TestTetoDeTempo(unittest.TestCase):
-    def test_o_teto_vai_na_conexao(self):
+    def testOTetoVaiNaConexao(self):
         self.assertIn(f"statement_timeout={banco.TIMEOUT_CONSULTA_MS}", banco.CONNINFO)
 
-    def test_a_conninfo_e_valida_para_o_libpq(self):
+    def testAConninfoEValidaParaOLibpq(self):
         """O teste que faltava — e que deixou passar um 503 em produção.
 
         Afirmar que a string CONTÉM `options=-c statement_timeout=` não prova
@@ -56,7 +56,7 @@ class TestTetoDeTempo(unittest.TestCase):
             f"-c statement_timeout={banco.TIMEOUT_CONSULTA_MS}",
         )
 
-    def test_o_cursor_nao_usa_mais_set_local(self):
+    def testOCursorNaoUsaMaisSetLocal(self):
         """`SET LOCAL` sozinho, em autocommit, não sobrevive ao próprio comando."""
         executados: list[str] = []
 
@@ -87,7 +87,7 @@ class TestTetoDeTempo(unittest.TestCase):
                 return CursorFalso()
 
         b = banco.Banco()
-        with mock.patch.object(b._pool, "connection", return_value=ConexaoFalsa()):
+        with mock.patch.object(b.pool, "connection", return_value=ConexaoFalsa()):
             b.consultar("SELECT 1")
 
         self.assertNotIn(
@@ -99,7 +99,7 @@ class TestTetoDeTempo(unittest.TestCase):
 
 
 class TestConninfo(unittest.TestCase):
-    def test_traz_o_que_o_psycopg_precisa(self):
+    def testTrazOQueOPsycopgPrecisa(self):
         for chave in ("host=", "port=", "user=", "dbname="):
             self.assertIn(chave, banco.CONNINFO)
 

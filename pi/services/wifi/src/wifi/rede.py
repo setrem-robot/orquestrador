@@ -23,7 +23,7 @@ class ErroRede(Exception):
     """Falha ao executar uma operação de rede (nmcli indisponível/erro)."""
 
 
-def _run_nmcli(args: list[str], timeout: float = 45.0) -> subprocess.CompletedProcess:
+def runNmcli(args: list[str], timeout: float = 45.0) -> subprocess.CompletedProcess:
     """Roda `nmcli <args>` capturando saída. Não levanta em returncode != 0."""
     try:
         return subprocess.run(
@@ -39,7 +39,7 @@ def _run_nmcli(args: list[str], timeout: float = 45.0) -> subprocess.CompletedPr
         raise ErroRede("tempo esgotado falando com o nmcli") from exc
 
 
-def _split_terse(linha: str) -> list[str]:
+def splitTerse(linha: str) -> list[str]:
     """Divide uma linha do modo terse do nmcli (`-t`) nos campos.
 
     O nmcli separa campos por ':' e escapa ':' e '\\' literais com '\\'. Um
@@ -66,9 +66,9 @@ def _split_terse(linha: str) -> list[str]:
     return campos
 
 
-def escanear_redes(iface: str) -> list[dict[str, Any]]:
+def escanearRedes(iface: str) -> list[dict[str, Any]]:
     """Lista as redes Wi-Fi visíveis, sem duplicatas, da mais forte p/ a mais fraca."""
-    cp = _run_nmcli(
+    cp = runNmcli(
         ["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "ifname", iface]
     )
     if cp.returncode != 0:
@@ -79,7 +79,7 @@ def escanear_redes(iface: str) -> list[dict[str, Any]]:
     for linha in cp.stdout.splitlines():
         if not linha:
             continue
-        campos = _split_terse(linha)
+        campos = splitTerse(linha)
         ssid = campos[0] if campos else ""
         if not ssid or ssid in vistos:
             continue  # ignora redes ocultas (SSID vazio) e duplicatas
@@ -92,15 +92,15 @@ def escanear_redes(iface: str) -> list[dict[str, Any]]:
     return redes
 
 
-def status_atual(iface: str) -> dict[str, Any]:
+def statusAtual(iface: str) -> dict[str, Any]:
     """Estado atual da interface: conectado?, SSID e IP."""
-    cp = _run_nmcli(
+    cp = runNmcli(
         ["-t", "-f", "GENERAL.CONNECTION,IP4.ADDRESS", "device", "show", iface]
     )
     ssid: str | None = None
     ip: str | None = None
     for linha in cp.stdout.splitlines():
-        campos = _split_terse(linha)
+        campos = splitTerse(linha)
         if len(campos) < 2:
             continue
         chave, valor = campos[0], campos[1]
@@ -117,11 +117,11 @@ def conectar(ssid: str, senha: str, iface: str) -> dict[str, Any]:
     args = ["-w", "45", "device", "wifi", "connect", ssid, "ifname", iface]
     if senha:
         args += ["password", senha]
-    cp = _run_nmcli(args, timeout=60.0)
+    cp = runNmcli(args, timeout=60.0)
     if cp.returncode != 0:
         # nmcli manda a causa (senha incorreta, rede fora de alcance...) no stderr.
         raise ErroRede(cp.stderr.strip() or cp.stdout.strip() or "falha ao conectar")
-    return status_atual(iface)
+    return statusAtual(iface)
 
 
 def processar(comando: dict[str, Any], iface: str) -> dict[str, Any]:
@@ -139,10 +139,10 @@ def processar(comando: dict[str, Any], iface: str) -> dict[str, Any]:
 
     try:
         if acao == "status":
-            return {"ok": True, "acao": "status", **status_atual(iface)}
+            return {"ok": True, "acao": "status", **statusAtual(iface)}
 
         if acao == "listar":
-            return {"ok": True, "acao": "listar", "redes": escanear_redes(iface)}
+            return {"ok": True, "acao": "listar", "redes": escanearRedes(iface)}
 
         if acao == "conectar":
             ssid = comando.get("ssid")

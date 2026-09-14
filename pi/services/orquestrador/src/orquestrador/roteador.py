@@ -96,17 +96,17 @@ class ComandoMotor(ComandoRoteavel):
                     topics.MOTORES_COMANDO,
                     {
                         "acao": "mover",
-                        "linear": self._limitar_eixo(cmd.get("linear")),
-                        "angular": self._limitar_eixo(cmd.get("angular")),
+                        "linear": self.limitarEixo(cmd.get("linear")),
+                        "angular": self.limitarEixo(cmd.get("angular")),
                     },
                 )
             ]
 
-        velocidade = 0 if acao == "parar" else self._limitar_velocidade(cmd.get("velocidade"))
+        velocidade = 0 if acao == "parar" else self.limitarVelocidade(cmd.get("velocidade"))
         return [(topics.MOTORES_COMANDO, {"acao": acao, "velocidade": velocidade})]
 
     @staticmethod
-    def _limitar_velocidade(valor: Any) -> int:
+    def limitarVelocidade(valor: Any) -> int:
         """Converte e satura a velocidade em [0, 100].
 
         O app é não-confiável: pode mandar string, número fora da faixa ou nada.
@@ -118,7 +118,7 @@ class ComandoMotor(ComandoRoteavel):
         return max(0, min(100, v))
 
     @staticmethod
-    def _limitar_eixo(valor: Any) -> float:
+    def limitarEixo(valor: Any) -> float:
         """Converte e satura um eixo em [-1, 1].
 
         Ausente vira zero, e não um padrão de movimento: um `mover` sem eixo
@@ -146,7 +146,7 @@ class ComandoVoz(ComandoRoteavel):
 class ComandoParadaEmergencia(ComandoRoteavel):
     """tipo: "parada_emergencia" — zera os motores imediatamente."""
 
-    def rotear(self, _cmd: dict[str, Any]) -> list[Publicacao]:
+    def rotear(self, cmd: dict[str, Any]) -> list[Publicacao]:
         # Segurança em primeiro lugar: zera os motores imediatamente.
         return [(topics.MOTORES_COMANDO, {"acao": "parar", "velocidade": 0})]
 
@@ -174,7 +174,7 @@ class ComandoRota(ComandoRoteavel):
             return []
 
         if acao == "inicio":
-            total = self._inteiro_nao_negativo(cmd.get("total"))
+            total = self.inteiroNaoNegativo(cmd.get("total"))
             if total is None:
                 logger.warning("Rota 'inicio' sem total válido: %r", cmd)
                 return []
@@ -188,16 +188,16 @@ class ComandoRota(ComandoRoteavel):
             return [(topics.ROTA_COMANDO, {"acao": "fim"})]
 
         # acao == "ponto"
-        indice = self._inteiro_nao_negativo(cmd.get("i"))
-        lat = self._coordenada(cmd.get("lat"), limite=90.0)
-        lon = self._coordenada(cmd.get("lon"), limite=180.0)
+        indice = self.inteiroNaoNegativo(cmd.get("i"))
+        lat = self.coordenada(cmd.get("lat"), limite=90.0)
+        lon = self.coordenada(cmd.get("lon"), limite=180.0)
         if indice is None or lat is None or lon is None:
             logger.warning("Ponto de rota inválido (i/lat/lon): %r", cmd)
             return []
         return [(topics.ROTA_COMANDO, {"acao": "ponto", "i": indice, "lat": lat, "lon": lon})]
 
     @staticmethod
-    def _inteiro_nao_negativo(valor: Any) -> int | None:
+    def inteiroNaoNegativo(valor: Any) -> int | None:
         try:
             n = int(valor)
         except (TypeError, ValueError):
@@ -205,7 +205,7 @@ class ComandoRota(ComandoRoteavel):
         return n if n >= 0 else None
 
     @staticmethod
-    def _coordenada(valor: Any, *, limite: float) -> float | None:
+    def coordenada(valor: Any, *, limite: float) -> float | None:
         """Número dentro de [-limite, limite], ou None. Fora da faixa não é
         um ponto no planeta — é lixo de transmissão ou app com defeito."""
         try:

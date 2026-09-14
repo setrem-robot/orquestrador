@@ -71,7 +71,7 @@ class Velocidades:
         )
 
 
-def de_eixos(linear: float, angular: float) -> Velocidades:
+def deEixos(linear: float, angular: float) -> Velocidades:
     """Modelo diferencial: avanço e giro viram velocidade de cada lado.
 
     `linear` positivo vai para a frente, `angular` positivo gira para a direita.
@@ -93,25 +93,25 @@ def de_eixos(linear: float, angular: float) -> Velocidades:
     return Velocidades(esquerda=esquerda, direita=direita)
 
 
-def do_comando(acao: str, velocidade: int = 60, *, linear: float = 0.0, angular: float = 0.0) -> Velocidades:
+def doComando(acao: str, velocidade: int = 60, *, linear: float = 0.0, angular: float = 0.0) -> Velocidades:
     """Traduz um comando do contrato MQTT para velocidade de cada lado.
 
     `acao` é uma das quatro direções de sempre (usando `velocidade`, de 0 a
     100), ou `"mover"` — a forma contínua, que usa `linear` e `angular`.
     """
     if acao == "mover":
-        return de_eixos(_limitar(linear), _limitar(angular))
+        return deEixos(limitar(linear), limitar(angular))
 
     atalho = _ATALHOS.get(acao)
     if atalho is None:
         raise ValueError(f"ação de motor desconhecida: {acao!r}")
 
     escala = max(0.0, min(100.0, float(velocidade))) / 100.0
-    eixo_linear, eixo_angular = atalho
-    return de_eixos(eixo_linear * escala, eixo_angular * escala)
+    eixoLinear, eixoAngular = atalho
+    return deEixos(eixoLinear * escala, eixoAngular * escala)
 
 
-def _limitar(valor: float) -> float:
+def limitar(valor: float) -> float:
     return max(-1.0, min(1.0, float(valor)))
 
 
@@ -123,65 +123,65 @@ class Rampa:
     segundo não custa meio segundo.
     """
 
-    def __init__(self, por_segundo: float) -> None:
+    def __init__(self, porSegundo: float) -> None:
         #: Quanto a velocidade de um lado pode variar em um segundo, na escala
         #: de -1 a 1. 3,0 leva do parado ao máximo em um terço de segundo. Zero
         #: ou negativo desliga a rampa e faz cada comando valer imediatamente —
         #: que é o comportamento antigo, mantido para quem tiver um chassi leve
         #: o bastante para não perder passo.
-        self._por_segundo = por_segundo
-        self._atual = Velocidades()
-        self._alvo = Velocidades()
+        self.porSegundo = porSegundo
+        self.atualInterno = Velocidades()
+        self.alvoInterno = Velocidades()
 
     @property
     def ligada(self) -> bool:
-        return self._por_segundo > 0
+        return self.porSegundo > 0
 
     @property
     def atual(self) -> Velocidades:
-        return self._atual
+        return self.atualInterno
 
     @property
     def alvo(self) -> Velocidades:
-        return self._alvo
+        return self.alvoInterno
 
     @property
     def alcancou(self) -> bool:
         """Se já não há o que acelerar — o laço pode dormir mais."""
-        return self._atual == self._alvo
+        return self.atualInterno == self.alvoInterno
 
     def pedir(self, alvo: Velocidades) -> None:
         """Registra para onde ir. A chegada acontece nos `avancar` seguintes."""
-        self._alvo = alvo
+        self.alvoInterno = alvo
         if not self.ligada:
-            self._atual = alvo
+            self.atualInterno = alvo
 
-    def parar_agora(self) -> Velocidades:
+    def pararAgora(self) -> Velocidades:
         """Zera tudo sem rampa.
 
         Para a parada de emergência e para o vigia: quando o motivo de parar é
         que ninguém está no controle, meio segundo de desaceleração é meio
         segundo de robô andando sozinho.
         """
-        self._alvo = Velocidades()
-        self._atual = Velocidades()
-        return self._atual
+        self.alvoInterno = Velocidades()
+        self.atualInterno = Velocidades()
+        return self.atualInterno
 
     def avancar(self, dt: float) -> Velocidades:
         """Caminha `dt` segundos na direção do alvo e devolve onde ficou."""
-        if not self.ligada or self._atual == self._alvo:
-            self._atual = self._alvo
-            return self._atual
+        if not self.ligada or self.atualInterno == self.alvoInterno:
+            self.atualInterno = self.alvoInterno
+            return self.atualInterno
 
-        passo = self._por_segundo * max(0.0, dt)
-        self._atual = Velocidades(
-            esquerda=_aproximar(self._atual.esquerda, self._alvo.esquerda, passo),
-            direita=_aproximar(self._atual.direita, self._alvo.direita, passo),
+        passo = self.porSegundo * max(0.0, dt)
+        self.atualInterno = Velocidades(
+            esquerda=aproximar(self.atualInterno.esquerda, self.alvoInterno.esquerda, passo),
+            direita=aproximar(self.atualInterno.direita, self.alvoInterno.direita, passo),
         )
-        return self._atual
+        return self.atualInterno
 
 
-def _aproximar(de: float, para: float, passo: float) -> float:
+def aproximar(de: float, para: float, passo: float) -> float:
     """Move `de` na direção de `para`, no máximo `passo`, sem passar do ponto."""
     diferenca = para - de
     if abs(diferenca) <= passo:

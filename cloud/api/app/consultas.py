@@ -79,7 +79,7 @@ def limitar(valor: int | None, teto: int, padrao: int) -> int:
 # ---------------------------------------------------------------------------
 # Estado atual
 # ---------------------------------------------------------------------------
-def estado_atual() -> tuple[str, tuple]:
+def estadoAtual() -> tuple[str, tuple]:
     """A última mensagem de cada tipo, numa consulta só.
 
     `DISTINCT ON` é do Postgres e resolve isto sem subconsulta por tipo: ordena
@@ -153,22 +153,22 @@ def serie(
     """
     inicio, fim = janela(desde, ate)
     passo = INTERVALOS[intervalo]
-    valor_sql, existe_sql = _expressao_campo(campo)
+    valorSql, existeSql = expressaoCampo(campo)
     sql = f"""
         SELECT time_bucket('{passo}', ts) AS instante,
-               avg(({valor_sql})::double precision) AS valor,
+               avg(({valorSql})::double precision) AS valor,
                count(*) AS amostras
         FROM telemetria
         WHERE tipo = %s
           AND ts BETWEEN %s AND %s
-          AND {existe_sql}
+          AND {existeSql}
         GROUP BY instante
         ORDER BY instante ASC
     """
     return sql, (tipo, inicio, fim)
 
 
-def _expressao_campo(campo: str) -> tuple[str, str]:
+def expressaoCampo(campo: str) -> tuple[str, str]:
     """Do nome do campo -> (expressão do valor, expressão de existência) em SQL.
 
     Um campo pode ser aninhado, com pontos, para alcançar os blocos da saúde do
@@ -190,7 +190,7 @@ def _expressao_campo(campo: str) -> tuple[str, str]:
     return f"{base}->>'{folha}'", f"{base} ? '{folha}'"
 
 
-def campo_valido(campo: str) -> bool:
+def campoValido(campo: str) -> bool:
     """Se o nome do campo pode ser interpolado no SQL com segurança.
 
     Letras, dígitos e sublinhado em cada segmento, separados por pontos para os
@@ -213,7 +213,7 @@ def campo_valido(campo: str) -> bool:
 # Eventos crus
 # ---------------------------------------------------------------------------
 def eventos(
-    tipo: str | None, limite: int | None, antes_de: datetime | None
+    tipo: str | None, limite: int | None, antesDe: datetime | None
 ) -> tuple[str, tuple]:
     """As últimas mensagens como chegaram, do mais novo para o mais antigo.
 
@@ -229,9 +229,9 @@ def eventos(
     if tipo:
         condicoes.append("tipo = %s")
         parametros.append(tipo)
-    if antes_de is not None:
+    if antesDe is not None:
         condicoes.append("ts < %s")
-        parametros.append(antes_de)
+        parametros.append(antesDe)
 
     parametros.append(quantos)
     sql = f"""
@@ -259,7 +259,7 @@ def resumo() -> tuple[str, tuple]:
     return sql, ()
 
 
-def saude_sistema() -> tuple[str, tuple]:
+def saudeSistema() -> tuple[str, tuple]:
     """A última leitura de saúde do Pi (`tipo='sistema'`).
 
     É seguro servir sem token: temperatura, CPU, memória, disco e rede não

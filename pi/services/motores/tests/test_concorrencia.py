@@ -47,16 +47,16 @@ class AcionamentoEspiao(AcionamentoSimulado):
         def invadir() -> None:
             # `acquire(blocking=False)` de outra thread: com o cadeado tomado,
             # falha; sem cadeado, entra na hora.
-            if self.servico._cadeado.acquire(blocking=False):
+            if self.servico.cadeado.acquire(blocking=False):
                 self.invasoes += 1
-                self.servico._cadeado.release()
+                self.servico.cadeado.release()
 
         t = threading.Thread(target=invadir)
         t.start()
         t.join(timeout=2.0)
 
 
-def _servico() -> tuple[ServicoMotores, AcionamentoEspiao]:
+def criarServico() -> tuple[ServicoMotores, AcionamentoEspiao]:
     espiao = AcionamentoEspiao()
     servico = ServicoMotores(espiao, Vigia(1.0), aceleracao=0.0)
     espiao.servico = servico
@@ -64,23 +64,23 @@ def _servico() -> tuple[ServicoMotores, AcionamentoEspiao]:
 
 
 class TestExclusaoMutua(unittest.TestCase):
-    def test_ninguem_entra_enquanto_o_tick_aplica(self):
-        servico, espiao = _servico()
+    def testNinguemEntraEnquantoOTickAplica(self):
+        servico, espiao = criarServico()
         servico.tick(0.05, 1.0)
         self.assertEqual(espiao.invasoes, 0, "outra thread entrou durante o tick")
 
-    def test_ninguem_entra_enquanto_um_comando_e_aplicado(self):
-        servico, espiao = _servico()
+    def testNinguemEntraEnquantoUmComandoEAplicado(self):
+        servico, espiao = criarServico()
         servico.receber({"acao": "parar"}, 1.0)
         self.assertEqual(espiao.invasoes, 0, "outra thread entrou durante o comando")
 
-    def test_ninguem_entra_durante_a_parada_de_emergencia(self):
-        servico, espiao = _servico()
-        servico.parada_de_emergencia("o teste mandou")
+    def testNinguemEntraDuranteAParadaDeEmergencia(self):
+        servico, espiao = criarServico()
+        servico.paradaDeEmergencia("o teste mandou")
         self.assertEqual(espiao.invasoes, 0, "outra thread entrou durante a parada")
 
-    def test_ninguem_entra_durante_o_encerramento(self):
-        servico, espiao = _servico()
+    def testNinguemEntraDuranteOEncerramento(self):
+        servico, espiao = criarServico()
         servico.encerrar()
         self.assertEqual(espiao.invasoes, 0, "outra thread entrou durante o encerramento")
 
@@ -88,8 +88,8 @@ class TestExclusaoMutua(unittest.TestCase):
 class TestOCadeadoNaoTrava(unittest.TestCase):
     """Reentrância: `tick()` chama `parada_de_emergencia()`, que também tranca."""
 
-    def test_o_vigia_expirando_dentro_do_tick_nao_trava(self):
-        servico, espiao = _servico()
+    def testOVigiaExpirandoDentroDoTickNaoTrava(self):
+        servico, espiao = criarServico()
         servico.receber({"acao": "frente", "velocidade": 80}, 1.0)
         # Um segundo e pouco depois, sem repetição: o vigia manda parar, e ele
         # faz isso de dentro do `tick`. Com um `Lock` simples no lugar de um
@@ -97,8 +97,8 @@ class TestOCadeadoNaoTrava(unittest.TestCase):
         servico.tick(0.05, 3.0)
         self.assertEqual(espiao.aplicados[-1], (0.0, 0.0))
 
-    def test_o_laco_continua_vivo_depois_disso(self):
-        servico, espiao = _servico()
+    def testOLacoContinuaVivoDepoisDisso(self):
+        servico, espiao = criarServico()
         servico.receber({"acao": "frente", "velocidade": 80}, 1.0)
         servico.tick(0.05, 3.0)
         servico.receber({"acao": "frente", "velocidade": 40}, 4.0)
@@ -107,7 +107,7 @@ class TestOCadeadoNaoTrava(unittest.TestCase):
 
 
 class TestMuitasThreadsAoMesmoTempo(unittest.TestCase):
-    def test_comandos_e_ticks_em_paralelo_nao_quebram_nada(self):
+    def testComandosETicksEmParaleloNaoQuebramNada(self):
         """Não afere ordem — afere que nada explode e que a parada é a última palavra."""
         espiao = AcionamentoEspiao()
         servico = ServicoMotores(espiao, Vigia(1.0), aceleracao=0.0)
@@ -135,7 +135,7 @@ class TestMuitasThreadsAoMesmoTempo(unittest.TestCase):
             t.join(timeout=10.0)
 
         self.assertEqual(erros, [])
-        servico.parada_de_emergencia("fim do teste")
+        servico.paradaDeEmergencia("fim do teste")
         self.assertEqual(espiao.aplicados[-1], (0.0, 0.0))
 
 

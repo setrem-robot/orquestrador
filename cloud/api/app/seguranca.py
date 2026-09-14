@@ -67,26 +67,26 @@ CACHE_RESUMO_S = float(os.environ.get("CACHE_RESUMO_S", "60"))
 class CacheCurto:
     """Guarda um valor por alguns segundos. Um só, e sem thread de limpeza."""
 
-    def __init__(self, validade_s: float) -> None:
-        self._validade = validade_s
-        self._valor: object | None = None
-        self._gravado_em = 0.0
+    def __init__(self, validadeS: float) -> None:
+        self.validade = validadeS
+        self.valor: object | None = None
+        self.gravadoEm = 0.0
 
     def obter(self):
-        if self._valor is None or time.monotonic() - self._gravado_em >= self._validade:
+        if self.valor is None or time.monotonic() - self.gravadoEm >= self.validade:
             return None
-        return self._valor
+        return self.valor
 
     def guardar(self, valor) -> None:
-        self._valor = valor
-        self._gravado_em = time.monotonic()
+        self.valor = valor
+        self.gravadoEm = time.monotonic()
 
 
-def token_configurado() -> bool:
+def tokenConfigurado() -> bool:
     return bool(TOKEN)
 
 
-def token_confere(cabecalho: str | None) -> bool:
+def tokenConfere(cabecalho: str | None) -> bool:
     """Valida o `Authorization: Bearer <token>`.
 
     `compare_digest` em vez de `==` porque a comparação normal de strings
@@ -104,7 +104,7 @@ def token_confere(cabecalho: str | None) -> bool:
     return hmac.compare_digest(cabecalho[7:].strip(), TOKEN)
 
 
-def arredondar_coordenada(valor: float | None) -> float | None:
+def arredondarCoordenada(valor: float | None) -> float | None:
     if valor is None or PRECISAO_GPS_PUBLICA <= 0:
         return valor
     return round(valor, PRECISAO_GPS_PUBLICA)
@@ -119,35 +119,35 @@ class Limitador:
     derrubando a VM sozinha.
     """
 
-    def __init__(self, teto: int, janela_s: float) -> None:
-        self._teto = teto
-        self._janela = janela_s
-        self._batidas: dict[str, deque[float]] = defaultdict(deque)
+    def __init__(self, teto: int, janelaS: float) -> None:
+        self.teto = teto
+        self.janela = janelaS
+        self.batidas: dict[str, deque[float]] = defaultdict(deque)
 
     def permitir(self, chave: str) -> bool:
         agora = time.monotonic()
-        fila = self._batidas[chave]
+        fila = self.batidas[chave]
         # `>=` e não `>`: uma batida com exatamente a idade da janela já saiu
         # dela. Com `>`, duas chamadas que o relógio não consegue separar (o
         # `time.monotonic()` do Windows anda de 15 em 15 ms) contavam como
         # simultâneas para sempre, e a janela nunca expirava.
-        while fila and agora - fila[0] >= self._janela:
+        while fila and agora - fila[0] >= self.janela:
             fila.popleft()
-        if len(fila) >= self._teto:
+        if len(fila) >= self.teto:
             return False
         fila.append(agora)
         # Sem isto o dicionário cresceria para sempre num serviço exposto à
         # internet: cada IP que passa uma vez deixaria uma fila vazia atrás.
-        if len(self._batidas) > 5000:
-            self._esquecer_ociosos(agora)
+        if len(self.batidas) > 5000:
+            self.esquecerOciosos(agora)
         return True
 
-    def _esquecer_ociosos(self, agora: float) -> None:
+    def esquecerOciosos(self, agora: float) -> None:
         mortos = [
             chave
-            for chave, fila in self._batidas.items()
-            if not fila or agora - fila[-1] > self._janela * 10
+            for chave, fila in self.batidas.items()
+            if not fila or agora - fila[-1] > self.janela * 10
         ]
         for chave in mortos:
-            del self._batidas[chave]
+            del self.batidas[chave]
         logger.debug("limitador esqueceu %d clientes ociosos", len(mortos))

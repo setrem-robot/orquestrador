@@ -26,7 +26,7 @@ import time
 from typing import Any
 
 from robo_common import topics
-from robo_common.mqtt_client import MqttService
+from robo_common.mqttClient import MqttService
 
 from . import rede
 
@@ -43,20 +43,20 @@ MQTT_HOST = os.environ.get("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 HEARTBEAT_INTERVALO_S = float(os.environ.get("HEARTBEAT_INTERVALO_S", "10"))
 
-_parar = False
+parar = False
 
 
-def _tratar_sinal(signum, _frame) -> None:
-    global _parar
+def tratarSinal(signum, frame) -> None:
+    global parar
     logger.info("Sinal %s recebido; encerrando com elegância...", signum)
-    _parar = True
+    parar = True
 
 
-def _publicar_status_wifi(mqtt_svc: MqttService, resposta: dict[str, Any]) -> None:
+def publicarStatusWifi(mqttSvc: MqttService, resposta: dict[str, Any]) -> None:
     """Espelha no MQTT o estado da conexão após um conectar/status bem-sucedido."""
     if not resposta.get("ok") or resposta.get("acao") not in ("conectar", "status"):
         return
-    mqtt_svc.publish_json(
+    mqttSvc.publishJson(
         topics.SISTEMA_WIFI,
         {
             "conectado": resposta.get("conectado", True),
@@ -69,8 +69,8 @@ def _publicar_status_wifi(mqtt_svc: MqttService, resposta: dict[str, Any]) -> No
     )
 
 
-def _ao_receber_comando(
-    mqtt_svc: MqttService, _topico: str, comando: dict[str, Any]
+def aoReceberComando(
+    mqttSvc: MqttService, topico: str, comando: dict[str, Any]
 ) -> None:
     """Handler de robo/wifi/comando: aplica a ação e publica o estado."""
     resposta = rede.processar(comando, WIFI_IFACE)
@@ -78,48 +78,48 @@ def _ao_receber_comando(
         logger.info("Comando wifi '%s' aplicado: %s", resposta.get("acao"), resposta)
     else:
         logger.warning("Comando wifi falhou: %s", resposta)
-    _publicar_status_wifi(mqtt_svc, resposta)
+    publicarStatusWifi(mqttSvc, resposta)
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, _tratar_sinal)
-    signal.signal(signal.SIGTERM, _tratar_sinal)
+    signal.signal(signal.SIGINT, tratarSinal)
+    signal.signal(signal.SIGTERM, tratarSinal)
 
-    mqtt_svc = MqttService(
-        client_id=SERVICO,
+    mqttSvc = MqttService(
+        clientId=SERVICO,
         host=MQTT_HOST,
         port=MQTT_PORT,
-        heartbeat_topic=topics.heartbeat(SERVICO),
+        heartbeatTopic=topics.heartbeat(SERVICO),
     )
-    mqtt_svc.on(
+    mqttSvc.on(
         topics.WIFI_COMANDO,
-        lambda topico, msg: _ao_receber_comando(mqtt_svc, topico, msg),
+        lambda topico, msg: aoReceberComando(mqttSvc, topico, msg),
     )
-    mqtt_svc.start()
+    mqttSvc.start()
     logger.info("Serviço wifi no ar; aguardando comandos em %s.", topics.WIFI_COMANDO)
 
     # Ao subir, publica o estado atual da rede (útil para o dashboard/nuvem).
-    _publicar_status_wifi(
-        mqtt_svc, {"ok": True, "acao": "status", **rede.status_atual(WIFI_IFACE)}
+    publicarStatusWifi(
+        mqttSvc, {"ok": True, "acao": "status", **rede.statusAtual(WIFI_IFACE)}
     )
 
-    proximo_heartbeat = 0.0
+    proximoHeartbeat = 0.0
     try:
-        while not _parar:
+        while not parar:
             agora = time.monotonic()
-            if agora >= proximo_heartbeat:
-                mqtt_svc.publish_json(
+            if agora >= proximoHeartbeat:
+                mqttSvc.publishJson(
                     topics.heartbeat(SERVICO),
                     {"servico": SERVICO, "status": "online", "ts": time.time()},
                     qos=0,
                     retain=True,
                 )
-                proximo_heartbeat = agora + HEARTBEAT_INTERVALO_S
+                proximoHeartbeat = agora + HEARTBEAT_INTERVALO_S
             # O trabalho real acontece no callback (thread do paho); aqui só
             # mantemos o processo vivo e responsivo a parada/heartbeat.
             time.sleep(0.5)
     finally:
-        mqtt_svc.stop()
+        mqttSvc.stop()
 
 
 if __name__ == "__main__":

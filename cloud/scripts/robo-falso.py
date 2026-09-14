@@ -40,12 +40,12 @@ import telemetria_falsa as falsa
 #: gráfico e o mapa saírem com a mesma densidade que terão em campo.
 CADENCIA = {"gps": 1, "motores": 2, "bateria": 12, "wifi": 12}
 
-_parar = False
+parar = False
 
 
-def _ao_sinal(_signum, _frame) -> None:
-    global _parar
-    _parar = True
+def aoSinal(signum, frame) -> None:
+    global parar
+    parar = True
 
 
 def conectar(host: str, porta: int, usuario: str, senha: str) -> mqtt.Client:
@@ -75,8 +75,8 @@ def main() -> int:
     )
     argumentos = parser.parse_args()
 
-    signal.signal(signal.SIGINT, _ao_sinal)
-    signal.signal(signal.SIGTERM, _ao_sinal)
+    signal.signal(signal.SIGINT, aoSinal)
+    signal.signal(signal.SIGTERM, aoSinal)
 
     intervalo = 0.1 if argumentos.rapido else 1.0
 
@@ -97,20 +97,20 @@ def main() -> int:
     indice = 0
     publicadas = 0
 
-    while not _parar:
+    while not parar:
         agora = datetime.now(tz=timezone.utc)
 
-        a_publicar = []
+        aPublicar = []
         if indice % CADENCIA["gps"] == 0:
-            a_publicar.append(("gps", falsa.gps(indice, total, agora)))
+            aPublicar.append(("gps", falsa.gps(indice, total, agora)))
         if indice % CADENCIA["motores"] == 0:
-            a_publicar.append(("motores", falsa.motores(indice, agora)))
+            aPublicar.append(("motores", falsa.motores(indice, agora)))
         if indice % CADENCIA["bateria"] == 0:
-            a_publicar.append(("bateria", carga.proxima(agora, CADENCIA["bateria"] * intervalo)))
+            aPublicar.append(("bateria", carga.proxima(agora, CADENCIA["bateria"] * intervalo)))
         if indice % CADENCIA["wifi"] == 0:
-            a_publicar.append(("wifi", falsa.wifi(indice, agora)))
+            aPublicar.append(("wifi", falsa.wifi(indice, agora)))
 
-        for tipo, payload in a_publicar:
+        for tipo, payload in aPublicar:
             # QoS 1 e retido, como o robô de verdade publica: o `retain` é o que
             # faz o app achar o último estado assim que se conecta, em vez de
             # esperar a próxima mensagem chegar.

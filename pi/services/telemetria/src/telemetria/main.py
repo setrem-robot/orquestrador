@@ -41,7 +41,7 @@ import subprocess
 import time
 
 from robo_common import topics
-from robo_common.mqtt_client import MqttService
+from robo_common.mqttClient import MqttService
 
 from telemetria import coletor
 
@@ -61,16 +61,16 @@ HEARTBEAT_INTERVALO_S = float(os.environ.get("HEARTBEAT_INTERVALO_S", "10"))
 
 TOPICO = topics.telemetria("sistema")
 
-_parar = False
+parar = False
 
 
-def _tratar_sinal(signum, _frame) -> None:
-    global _parar
+def tratarSinal(signum, frame) -> None:
+    global parar
     logger.info("Sinal %s recebido; encerrando com elegância...", signum)
-    _parar = True
+    parar = True
 
 
-def _ler_arquivo(caminho: str) -> str:
+def lerArquivo(caminho: str) -> str:
     """Lê um arquivo de texto; devolve "" se não der (o parser trata o vazio)."""
     try:
         with open(caminho, encoding="ascii", errors="ignore") as f:
@@ -79,7 +79,7 @@ def _ler_arquivo(caminho: str) -> str:
         return ""
 
 
-def _vcgencmd(*args: str) -> str:
+def vcgencmd(*args: str) -> str:
     """Roda `vcgencmd <args>`; "" se o binário não existe (não é um Pi) ou falha.
 
     Numa máquina que não é Raspberry, `vcgencmd` não existe — e isso não é erro,
@@ -95,7 +95,7 @@ def _vcgencmd(*args: str) -> str:
         return ""
 
 
-def _uso_disco() -> dict | None:
+def usoDisco() -> dict | None:
     # `os.statvfs` não existe fora de sistemas POSIX (numa máquina de mesa
     # Windows, por exemplo). `getattr` em vez de chamada direta para o serviço
     # rodar degradado onde não há `/`, como fazem os outros serviços do robô.
@@ -106,7 +106,7 @@ def _uso_disco() -> dict | None:
         st = statvfs("/")
     except OSError:
         return None
-    return coletor.uso_disco(st.f_frsize * st.f_blocks, st.f_frsize * st.f_bavail)
+    return coletor.usoDisco(st.f_frsize * st.f_blocks, st.f_frsize * st.f_bavail)
 
 
 #: Onde o kernel expõe a frequência e o governor do primeiro núcleo. O robô lê
@@ -116,7 +116,7 @@ _FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
 _GOVERNOR = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 
 
-def _cpu(nucleos_anterior: dict[str, tuple[int, int]]) -> tuple[dict, dict]:
+def lerCpu(nucleosAnterior: dict[str, tuple[int, int]]) -> tuple[dict, dict]:
     """Monta o bloco `cpu` do payload. Devolve (bloco, leitura atual por núcleo).
 
     A CPU é a única medida que precisa de duas leituras (é um delta): guardamos
@@ -124,89 +124,89 @@ def _cpu(nucleos_anterior: dict[str, tuple[int, int]]) -> tuple[dict, dict]:
     delta, então `uso_pct` e `por_nucleo` ficam None/[] e aparecem da segunda
     publicação em diante.
     """
-    agora = coletor.nucleos_do_proc_stat(_ler_arquivo("/proc/stat"))
-    uso_pct = None
-    por_nucleo: list[float | None] = []
-    if "cpu" in nucleos_anterior and "cpu" in agora:
-        uso_pct = coletor.cpu_uso_pct(nucleos_anterior["cpu"], agora["cpu"])
+    agora = coletor.nucleosDoProcStat(lerArquivo("/proc/stat"))
+    usoPct = None
+    porNucleo: list[float | None] = []
+    if "cpu" in nucleosAnterior and "cpu" in agora:
+        usoPct = coletor.cpuUsoPct(nucleosAnterior["cpu"], agora["cpu"])
     # Núcleos em ordem (cpu0, cpu1, ...), só os que existiam nas duas leituras.
     for nome in sorted(n for n in agora if n != "cpu"):
-        if nome in nucleos_anterior:
-            por_nucleo.append(coletor.cpu_uso_pct(nucleos_anterior[nome], agora[nome]))
+        if nome in nucleosAnterior:
+            porNucleo.append(coletor.cpuUsoPct(nucleosAnterior[nome], agora[nome]))
     bloco = {
-        "uso_pct": uso_pct,
-        "por_nucleo": por_nucleo,
-        "freq_mhz": coletor.parse_freq_khz(_ler_arquivo(_FREQ)),
-        "governor": _ler_arquivo(_GOVERNOR).strip() or None,
-        "voltagem_v": coletor.parse_volts(_vcgencmd("measure_volts")),
+        "uso_pct": usoPct,
+        "por_nucleo": porNucleo,
+        "freq_mhz": coletor.parseFreqKhz(lerArquivo(_FREQ)),
+        "governor": lerArquivo(_GOVERNOR).strip() or None,
+        "voltagem_v": coletor.parseVolts(vcgencmd("measure_volts")),
     }
     return bloco, agora
 
 
 def coletar(
-    nucleos_anterior: dict[str, tuple[int, int]],
+    nucleosAnterior: dict[str, tuple[int, int]],
 ) -> tuple[dict, dict[str, tuple[int, int]]]:
     """Monta o payload da saúde do Pi. Devolve (payload, leitura de CPU atual).
 
     A maioria das medidas é instantânea; só a CPU é um delta entre duas voltas,
     e por isso o estado dela viaja de uma chamada para a outra.
     """
-    loadavg = _ler_arquivo("/proc/loadavg")
-    cpu, nucleos_agora = _cpu(nucleos_anterior)
+    loadavg = lerArquivo("/proc/loadavg")
+    cpu, nucleosAgora = lerCpu(nucleosAnterior)
 
     payload = {
         "ts": time.time(),
-        "temperatura_c": coletor.parse_temperatura(
-            _ler_arquivo("/sys/class/thermal/thermal_zone0/temp")
+        "temperatura_c": coletor.parseTemperatura(
+            lerArquivo("/sys/class/thermal/thermal_zone0/temp")
         ),
-        "throttled": coletor.parse_throttled(_vcgencmd("get_throttled")),
+        "throttled": coletor.parseThrottled(vcgencmd("get_throttled")),
         "cpu": cpu,
-        "carga": coletor.parse_loadavg(loadavg),
-        "processos": coletor.parse_processos(loadavg),
-        "memoria": coletor.parse_meminfo(_ler_arquivo("/proc/meminfo")),
-        "disco": _uso_disco(),
-        "uptime_s": coletor.parse_uptime(_ler_arquivo("/proc/uptime")),
-        "rede": coletor.parse_rede(_ler_arquivo("/proc/net/dev")),
-        "wifi": coletor.parse_wireless(_ler_arquivo("/proc/net/wireless"), WIFI_IFACE),
+        "carga": coletor.parseLoadavg(loadavg),
+        "processos": coletor.parseProcessos(loadavg),
+        "memoria": coletor.parseMeminfo(lerArquivo("/proc/meminfo")),
+        "disco": usoDisco(),
+        "uptime_s": coletor.parseUptime(lerArquivo("/proc/uptime")),
+        "rede": coletor.parseRede(lerArquivo("/proc/net/dev")),
+        "wifi": coletor.parseWireless(lerArquivo("/proc/net/wireless"), WIFI_IFACE),
     }
-    return payload, nucleos_agora
+    return payload, nucleosAgora
 
 
 def main() -> None:
-    signal.signal(signal.SIGINT, _tratar_sinal)
-    signal.signal(signal.SIGTERM, _tratar_sinal)
+    signal.signal(signal.SIGINT, tratarSinal)
+    signal.signal(signal.SIGTERM, tratarSinal)
 
-    mqtt_svc = MqttService(
-        client_id=SERVICO,
+    mqttSvc = MqttService(
+        clientId=SERVICO,
         host=MQTT_HOST,
         port=MQTT_PORT,
-        heartbeat_topic=topics.heartbeat(SERVICO),
+        heartbeatTopic=topics.heartbeat(SERVICO),
     )
-    mqtt_svc.start()
+    mqttSvc.start()
     logger.info("Publicando saúde do Pi em %s a cada %.0fs.", TOPICO, INTERVALO_S)
 
-    nucleos_anterior: dict[str, tuple[int, int]] = {}
-    proximo_heartbeat = 0.0
-    proxima_publicacao = 0.0
+    nucleosAnterior: dict[str, tuple[int, int]] = {}
+    proximoHeartbeat = 0.0
+    proximaPublicacao = 0.0
 
     try:
-        while not _parar:
+        while not parar:
             agora = time.monotonic()
-            if agora >= proximo_heartbeat:
-                mqtt_svc.publish_json(
+            if agora >= proximoHeartbeat:
+                mqttSvc.publishJson(
                     topics.heartbeat(SERVICO),
                     {"servico": SERVICO, "status": "online", "ts": time.time()},
                     qos=0,
                     retain=True,
                 )
-                proximo_heartbeat = agora + HEARTBEAT_INTERVALO_S
+                proximoHeartbeat = agora + HEARTBEAT_INTERVALO_S
 
-            if agora >= proxima_publicacao:
-                payload, nucleos_anterior = coletar(nucleos_anterior)
+            if agora >= proximaPublicacao:
+                payload, nucleosAnterior = coletar(nucleosAnterior)
                 # QoS 1: é o que faz a bridge GUARDAR e reenviar o que não subiu
                 # enquanto a nuvem estava fora de alcance. Sem retain: cada
                 # medida é um instante do histórico, não um "último estado".
-                mqtt_svc.publish_json(TOPICO, payload, qos=1, retain=False)
+                mqttSvc.publishJson(TOPICO, payload, qos=1, retain=False)
                 thr = payload["throttled"]
                 logger.info(
                     "saúde: temp=%s°C cpu=%s%% freq=%sMHz mem=%s%% %s",
@@ -216,13 +216,13 @@ def main() -> None:
                     payload["memoria"]["uso_pct"] if payload["memoria"] else "?",
                     "OK" if (thr and thr.get("ok")) else "ATENÇÃO (throttled)",
                 )
-                proxima_publicacao = agora + INTERVALO_S
+                proximaPublicacao = agora + INTERVALO_S
 
             # Passo curto: mantém o loop responsivo ao heartbeat e à parada,
             # sem depender do intervalo (que pode ser longo).
             time.sleep(0.5)
     finally:
-        mqtt_svc.stop()
+        mqttSvc.stop()
 
 
 if __name__ == "__main__":

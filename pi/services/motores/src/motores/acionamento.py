@@ -64,7 +64,7 @@ PASSOS_S_MIN = 100.0
 PASSOS_S_MAX = 1000.0
 
 
-def passos_por_segundo(velocidade: float) -> float:
+def passosPorSegundo(velocidade: float) -> float:
     """Converte velocidade (0 a 1, em módulo) em frequência do pulso STEP."""
     intensidade = min(1.0, abs(velocidade))
     if intensidade < 0.001:
@@ -94,7 +94,7 @@ class Acionamento(ABC):
     def __enter__(self) -> Acionamento:
         return self
 
-    def __exit__(self, *_excecao: object) -> None:
+    def __exit__(self, *excecao: object) -> None:
         self.parar()
         self.fechar()
 
@@ -124,7 +124,7 @@ class AcionamentoSimulado(Acionamento):
         # sequência de comandos que interessa ler no teste.
         if velocidades != self.atual:
             self.historico.append(velocidades)
-            logger.debug("simulado: esquerda=%.2f direita=%.2f", *_par(velocidades))
+            logger.debug("simulado: esquerda=%.2f direita=%.2f", *par(velocidades))
 
     def parar(self) -> None:
         self.parou += 1
@@ -137,61 +137,61 @@ class AcionamentoSimulado(Acionamento):
 class AcionamentoStepper(Acionamento):
     """Dois motores de passo com driver TMC2209, pulso por PWM."""
 
-    def __init__(self, *, invertido_esquerda: bool = False, invertido_direita: bool = False) -> None:
+    def __init__(self, *, invertidoEsquerda: bool = False, invertidoDireita: bool = False) -> None:
         # Importado aqui, e não no topo, para o módulo continuar carregando numa
         # máquina sem GPIO — é o que deixa `AcionamentoSimulado` e os testes
         # viverem no mesmo arquivo que o hardware.
         from gpiozero import DigitalOutputDevice, PWMOutputDevice
 
-        self._inv_esq = invertido_esquerda
-        self._inv_dir = invertido_direita
+        self.invEsq = invertidoEsquerda
+        self.invDir = invertidoDireita
 
         # `initial_value=True` porque EN é active-low: o robô nasce com os
         # motores desenergizados, e não travados segurando o eixo.
-        self._en_esq = DigitalOutputDevice(ESQ_EN, initial_value=True)
-        self._en_dir = DigitalOutputDevice(DIR_EN, initial_value=True)
-        self._dir_esq = DigitalOutputDevice(ESQ_DIR)
-        self._dir_dir = DigitalOutputDevice(DIR_DIR)
+        self.enEsq = DigitalOutputDevice(ESQ_EN, initial_value=True)
+        self.enDir = DigitalOutputDevice(DIR_EN, initial_value=True)
+        self.dirEsq = DigitalOutputDevice(ESQ_DIR)
+        self.dirDir = DigitalOutputDevice(DIR_DIR)
         # `frequency` só passa a valer quando o duty sai de zero; começa em algo
         # válido porque frequência zero não existe para o PWM.
-        self._step_esq = PWMOutputDevice(ESQ_STEP, frequency=PASSOS_S_MIN)
-        self._step_dir = PWMOutputDevice(DIR_STEP, frequency=PASSOS_S_MIN)
+        self.stepEsq = PWMOutputDevice(ESQ_STEP, frequency=PASSOS_S_MIN)
+        self.stepDir = PWMOutputDevice(DIR_STEP, frequency=PASSOS_S_MIN)
 
-        self._energizado = False
-        self._aplicado = Velocidades()
-        self._sentidos: tuple[bool | None, bool | None] = (None, None)
+        self.energizado = False
+        self.aplicado = Velocidades()
+        self.sentidos: tuple[bool | None, bool | None] = (None, None)
 
     def aplicar(self, velocidades: Velocidades) -> None:
-        if velocidades == self._aplicado:
+        if velocidades == self.aplicado:
             return
-        self._aplicado = velocidades
+        self.aplicado = velocidades
 
         if velocidades.parado:
             self.parar()
             return
 
-        efetivas = velocidades.invertendo(self._inv_esq, self._inv_dir)
-        if not self._energizado:
-            self._en_esq.off()  # LOW habilita
-            self._en_dir.off()
-            self._energizado = True
+        efetivas = velocidades.invertendo(self.invEsq, self.invDir)
+        if not self.energizado:
+            self.enEsq.off()  # LOW habilita
+            self.enDir.off()
+            self.energizado = True
 
-        self._pino(self._dir_esq, self._step_esq, efetivas.esquerda, lado=0)
-        self._pino(self._dir_dir, self._step_dir, efetivas.direita, lado=1)
+        self.pino(self.dirEsq, self.stepEsq, efetivas.esquerda, lado=0)
+        self.pino(self.dirDir, self.stepDir, efetivas.direita, lado=1)
 
-    def _pino(self, direcao, passo, velocidade: float, *, lado: int) -> None:
+    def pino(self, direcao, passo, velocidade: float, *, lado: int) -> None:
         """Ajusta sentido e frequência de um lado."""
         sentido = velocidade >= 0
-        if self._sentidos[lado] is not sentido:
+        if self.sentidos[lado] is not sentido:
             # O TMC2209 exige que o DIR já esteja estável quando o flanco do
             # STEP chega. Zerar o duty antes de virar o sentido garante isso sem
             # nenhum `sleep`: enquanto não há pulso, não há flanco para chegar
             # cedo demais.
             passo.value = 0.0
             direcao.value = 1 if sentido else 0
-            self._sentidos = _substituir(self._sentidos, lado, sentido)
+            self.sentidos = substituir(self.sentidos, lado, sentido)
 
-        frequencia = passos_por_segundo(velocidade)
+        frequencia = passosPorSegundo(velocidade)
         if frequencia <= 0:
             passo.value = 0.0
             return
@@ -201,22 +201,22 @@ class AcionamentoStepper(Acionamento):
         passo.value = 0.5
 
     def parar(self) -> None:
-        self._step_esq.value = 0.0
-        self._step_dir.value = 0.0
-        self._en_esq.on()  # HIGH desabilita
-        self._en_dir.on()
-        self._energizado = False
-        self._aplicado = Velocidades()
-        self._sentidos = (None, None)
+        self.stepEsq.value = 0.0
+        self.stepDir.value = 0.0
+        self.enEsq.on()  # HIGH desabilita
+        self.enDir.on()
+        self.energizado = False
+        self.aplicado = Velocidades()
+        self.sentidos = (None, None)
 
     def fechar(self) -> None:
         for dispositivo in (
-            self._step_esq,
-            self._step_dir,
-            self._dir_esq,
-            self._dir_dir,
-            self._en_esq,
-            self._en_dir,
+            self.stepEsq,
+            self.stepDir,
+            self.dirEsq,
+            self.dirDir,
+            self.enEsq,
+            self.enDir,
         ):
             try:
                 dispositivo.close()
@@ -224,8 +224,8 @@ class AcionamentoStepper(Acionamento):
                 logger.debug("não consegui fechar um pino: %s", exc)
 
 
-def criar_acionamento(
-    backend: str, *, invertido_esquerda: bool = False, invertido_direita: bool = False
+def criarAcionamento(
+    backend: str, *, invertidoEsquerda: bool = False, invertidoDireita: bool = False
 ) -> Acionamento:
     """Instancia o acionamento pedido.
 
@@ -241,7 +241,7 @@ def criar_acionamento(
 
     try:
         return AcionamentoStepper(
-            invertido_esquerda=invertido_esquerda, invertido_direita=invertido_direita
+            invertidoEsquerda=invertidoEsquerda, invertidoDireita=invertidoDireita
         )
     except Exception as exc:
         if escolha != "auto":
@@ -250,11 +250,11 @@ def criar_acionamento(
         return AcionamentoSimulado()
 
 
-def _par(velocidades: Velocidades) -> tuple[float, float]:
+def par(velocidades: Velocidades) -> tuple[float, float]:
     return velocidades.esquerda, velocidades.direita
 
 
-def _substituir(
+def substituir(
     sentidos: tuple[bool | None, bool | None], indice: int, valor: bool
 ) -> tuple[bool | None, bool | None]:
     lista = list(sentidos)

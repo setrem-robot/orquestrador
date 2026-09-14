@@ -29,31 +29,31 @@ ACOES_DE_MOVIMENTO = frozenset({"frente", "tras", "esquerda", "direita"})
 class Vigia:
     """Diz quando faz tempo demais que o último comando de movimento chegou."""
 
-    def __init__(self, timeout_s: float) -> None:
+    def __init__(self, timeoutS: float) -> None:
         #: 0 ou negativo desliga o vigia. Existe para quem ainda usa um app que
         #: não repete o comando: sem a repetição, vigiar pararia o robô no meio
         #: de todo movimento. Desligar é a escolha errada para a segurança, e
         #: por isso o padrão do serviço é ligado.
-        self._timeout_s = timeout_s
-        self._ultimo_movimento_em: float | None = None
+        self.timeoutS = timeoutS
+        self.ultimoMovimentoEm: float | None = None
 
     @property
     def ligado(self) -> bool:
-        return self._timeout_s > 0
+        return self.timeoutS > 0
 
     @property
     def vigiando(self) -> bool:
         """Se há um movimento em curso sendo vigiado agora."""
-        return self._ultimo_movimento_em is not None
+        return self.ultimoMovimentoEm is not None
 
-    def comando_recebido(self, acao: str, agora: float) -> None:
+    def comandoRecebido(self, acao: str, agora: float) -> None:
         """Registra um comando. Movimento arma o vigia; parada desarma."""
         if acao in ACOES_DE_MOVIMENTO:
-            self.movimento_recebido(agora)
+            self.movimentoRecebido(agora)
         else:
-            self.parada_recebida()
+            self.paradaRecebida()
 
-    def movimento_recebido(self, agora: float) -> None:
+    def movimentoRecebido(self, agora: float) -> None:
         """Arma o vigia: há robô andando, e isso precisa continuar sendo pedido.
 
         Existe ao lado de `comando_recebido` porque nem todo comando diz pelo
@@ -61,11 +61,11 @@ class Vigia:
         parada, e com eles fora de zero é movimento. Quem já converteu o comando
         em velocidade sabe a resposta; o nome da ação, sozinho, não.
         """
-        self._ultimo_movimento_em = agora
+        self.ultimoMovimentoEm = agora
 
-    def parada_recebida(self) -> None:
+    def paradaRecebida(self) -> None:
         """Desarma o vigia: não há movimento a vigiar."""
-        self._ultimo_movimento_em = None
+        self.ultimoMovimentoEm = None
 
     def expirou(self, agora: float) -> bool:
         """Se o robô deve ser parado por falta de notícias.
@@ -74,9 +74,9 @@ class Vigia:
         parar de novo a cada volta do laço encheria o log e o tópico de status
         com a mesma parada repetida.
         """
-        if not self.ligado or self._ultimo_movimento_em is None:
+        if not self.ligado or self.ultimoMovimentoEm is None:
             return False
-        if agora - self._ultimo_movimento_em < self._timeout_s:
+        if agora - self.ultimoMovimentoEm < self.timeoutS:
             return False
-        self._ultimo_movimento_em = None
+        self.ultimoMovimentoEm = None
         return True
