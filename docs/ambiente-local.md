@@ -178,15 +178,15 @@ sozinha para a API do ambiente de testes — não é preciso editar o `config.js
 
 Duas ferramentas, com propósitos diferentes:
 
-**`semear-demonstracao.py`** grava direto no banco. É o atalho: enche seis
+**`semearDemonstracao.py`** grava direto no banco. É o atalho: enche seis
 horas de histórico num instante, e prova que a API sabe ler.
 
 ```bash
-python3 cloud/scripts/semear-demonstracao.py --horas 6
-python3 cloud/scripts/semear-demonstracao.py --limpar
+python3 cloud/scripts/semearDemonstracao.py --horas 6
+python3 cloud/scripts/semearDemonstracao.py --limpar
 ```
 
-**`robo-falso.py`** publica no MQTT, como o robô publicaria. É o caminho
+**`roboFalso.py`** publica no MQTT, como o robô publicaria. É o caminho
 inteiro:
 
 ```
@@ -195,7 +195,7 @@ robo-falso ──► mosquitto ──► ingestor ──► TimescaleDB ──�
 
 ```bash
 pip install paho-mqtt
-python3 cloud/scripts/robo-falso.py
+python3 cloud/scripts/roboFalso.py
 ```
 
 Um ponto que aparece no mapa do celular vindo daí provou todas essas peças de
@@ -271,7 +271,7 @@ docker compose up -d api
 - **`mosquitto.local.conf`** — lá o broker recebe conexão de fora, e sem senha
   qualquer um publicaria telemetria falsa no histórico do robô.
 - **Os dados de demonstração.** Antes de mostrar para alguém:
-  `python3 cloud/scripts/semear-demonstracao.py --limpar`.
+  `python3 cloud/scripts/semearDemonstracao.py --limpar`.
 
 ### Conferir que migrou de verdade
 

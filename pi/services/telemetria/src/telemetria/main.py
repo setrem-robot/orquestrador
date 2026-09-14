@@ -40,8 +40,8 @@ import signal
 import subprocess
 import time
 
-from robo_common import topics
-from robo_common.mqttClient import MqttService
+from roboCommon import topics
+from roboCommon.mqttClient import MqttService
 
 from telemetria import coletor
 

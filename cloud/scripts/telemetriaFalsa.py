@@ -2,9 +2,9 @@
 
 Usado por dois scripts com propósitos diferentes:
 
-- `semear-demonstracao.py` grava direto no banco. É o atalho: enche o histórico
+- `semearDemonstracao.py` grava direto no banco. É o atalho: enche o histórico
   de horas passadas num instante, para as telas terem o que mostrar.
-- `robo-falso.py` publica no MQTT, como o robô publicaria. É o caminho inteiro:
+- `roboFalso.py` publica no MQTT, como o robô publicaria. É o caminho inteiro:
   broker → ingestor → banco → API → app. Um dado que aparece na tela do celular
   vindo dele provou cada peça da corrente.
 
@@ -32,12 +32,12 @@ CENTRO_LON = -54.2406
 #: pontos — cerca de 3 km/h, a mesma ordem do que `velocidade_kmh` diz.
 RAIO = 0.0010
 
-#: Marca de tudo que sai daqui. `semear-demonstracao.py --limpar` apaga por
+#: Marca de tudo que sai daqui. `semearDemonstracao.py --limpar` apaga por
 #: ela, e só por ela — nunca por janela de tempo, que levaria junto a
 #: telemetria de verdade do mesmo período.
 MARCA = {"demo": True}
 
-#: Tópicos, iguais aos de `robo_common/topics.py`. Repetidos aqui porque estes
+#: Tópicos, iguais aos de `roboCommon/topics.py`. Repetidos aqui porque estes
 #: scripts vivem no lado da nuvem, que é deliberadamente independente da lib do
 #: Pi — a interface compartilhada é o nome do tópico, e ele é estável.
 TOPICOS = {

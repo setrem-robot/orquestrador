@@ -9,8 +9,8 @@ Encapsula o paho-mqtt (API 2.x) com o que todo serviço precisa:
 
 Uso típico:
 
-    from robo_common.mqttClient import MqttService
-    from robo_common import topics
+    from roboCommon.mqttClient import MqttService
+    from roboCommon import topics
 
     svc = MqttService(client_id="meu_servico",
                       heartbeat_topic=topics.heartbeat("meu_servico"))

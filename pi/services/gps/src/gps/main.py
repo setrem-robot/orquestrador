@@ -29,8 +29,8 @@ import time
 import pynmea2
 import serial  # pyserial
 
-from robo_common import topics
-from robo_common.mqttClient import MqttService
+from roboCommon import topics
+from roboCommon.mqttClient import MqttService
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),

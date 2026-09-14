@@ -278,13 +278,13 @@ else
         -e PGUSER="$(grep -E '^PGUSER=' .env | cut -d= -f2-)" \
         -e PGPASSWORD="$(grep -E '^PGPASSWORD=' .env | cut -d= -f2-)" \
         -e PGDATABASE="$(grep -E '^PGDATABASE=' .env | cut -d= -f2-)" \
-        python:3.12-slim sh -c 'pip install -q "psycopg[binary]" && python /s/semear-demonstracao.py --horas 6' \
+        python:3.12-slim sh -c 'pip install -q "psycopg[binary]" && python /s/semearDemonstracao.py --horas 6' \
         >/dev/null 2>&1; then
         ok "histórico gerado"
     else
         falha "não consegui semear automaticamente."
         info "rode à mão:  pip install 'psycopg[binary]' && \\"
-        info "  PGHOST=127.0.0.1 PGPASSWORD=... python3 cloud/scripts/semear-demonstracao.py"
+        info "  PGHOST=127.0.0.1 PGPASSWORD=... python3 cloud/scripts/semearDemonstracao.py"
     fi
 fi
 
@@ -299,7 +299,7 @@ ${BOLD}Comandos que você vai querer:${RESET}
     $0 --parar       desliga (os dados ficam)
     $0 --zerar       desliga e apaga o banco
 
-    python3 cloud/scripts/robo-falso.py    um robô publicando ao vivo,
+    python3 cloud/scripts/roboFalso.py    um robô publicando ao vivo,
                                            pelo caminho inteiro (MQTT → app)
 
 EOF
@@ -307,5 +307,5 @@ EOF
 # --- robô falso, se pedido --------------------------------------------------
 if [[ "${1:-}" == "--robo" ]]; then
     passo "Robô falso publicando (Ctrl-C encerra)"
-    exec python3 "${CLOUD_DIR}/scripts/robo-falso.py"
+    exec python3 "${CLOUD_DIR}/scripts/roboFalso.py"
 fi

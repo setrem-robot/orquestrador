@@ -6,7 +6,7 @@ nas fronteiras. Este documento é o mapa dessas fronteiras: quem fala com quem,
 por qual transporte, em qual formato, e onde mora o contrato de cada conversa.
 
 > **Onde este arquivo mora.** Dentro do repositório `orquestrador`, que é quem
-> guarda o contrato MQTT (`robo_common/topics.py`) — a fronteira mais movimentada
+> guarda o contrato MQTT (`roboCommon/topics.py`) — a fronteira mais movimentada
 > das três. Antes ele existia só na máquina de quem o escreveu, fora de qualquer
 > repositório: o mapa do sistema inteiro dependia de um disco não fazer barulho.
 >
@@ -51,7 +51,7 @@ Ou seja: **a cara está instalada, e do corpo só a telemetria.** O serviço
 `robo/telemetria/sistema`, e o Mosquitto do `apt` a espelha para a nuvem por
 *bridge* — é o que hoje enche o banco e alimenta o painel `/completo/`. O resto
 do `pi/services/` ainda **não** está instalado: nenhum `motores`,
-`orquestrador`, `gps`, `wifi` ou `serial_ingestor` está registrado no systemd,
+`orquestrador`, `gps`, `wifi` ou `serialIngestor` está registrado no systemd,
 e é por isso que o robô continua sem andar.
 
 O efeito prático, seguindo o caminho de um comando de direção:
@@ -184,13 +184,13 @@ Para entender cada repositório por dentro, há um passeio guiado em cada um:
   direção é `withoutResponse` — o próximo já vem a caminho).
 - **Formato:** uma linha JSON por mensagem, terminada em `\n`. Ex.: `{"cmd":"F"}`
   (frente) e, agora, a rota segura fatiada (ver §3).
-- **Quem é a ponte:** ou o **ESP32** (`orquestrador/esp32/esp32_ble_bridge`), ou
+- **Quem é a ponte:** ou o **ESP32** (`orquestrador/esp32/esp32BleBridge`), ou
   o **próprio Pi** (`../RobotEye/src/roboteye/ble/`). Qualquer um dos dois valida o
   JSON e publica em `robo/comando/entrada`. **Só um deve estar ativo por vez.**
 - **⚠️ Contrato que precisa bater nos dois lados:** os UUIDs do serviço BLE.
   - App: `RobotBleIds` em `../app/lib/services/robotConnection.dart`
     (`serviceUuid = 6e400001-b5a3-f393-e0a9-e50e24dcca9e`, RX `…0002`, TX `…0003`).
-  - ESP32: no topo de `esp32/esp32_ble_bridge/*.ino`.
+  - ESP32: no topo de `esp32/esp32BleBridge/*.ino`.
   - Pi: `../RobotEye/src/roboteye/ble/nus.py`.
   - **Mudou um, muda os três** — senão o celular não acha o robô, ou acha e
     nada chega.
@@ -198,7 +198,7 @@ Para entender cada repositório por dentro, há um passeio guiado em cada um:
 ### 2.2 Dentro do Pi — **MQTT (Mosquitto, porta 1883)**
 - **Transporte:** MQTT num broker local. É o barramento que liga a ponte BLE aos
   serviços (motores, gps, wifi) e ao RobotEye.
-- **Contrato (fonte de verdade):** `pi/services/_common/src/robo_common/topics.py`
+- **Contrato (fonte de verdade):** `pi/services/_common/src/roboCommon/topics.py`
   e `docs/contrato-mqtt.md`. **Nunca** escreva o nome de um tópico
   à mão em outro lugar — importe de `topics.py`.
 
@@ -284,7 +284,7 @@ robo/rota/comando   →   (nenhum consumidor hoje — gancho para navegação fu
 Estes são os pontos onde **mudar um lado sem o outro quebra em silêncio**:
 
 1. **UUIDs BLE** — app (`RobotBleIds`), ESP32 (`.ino`) e Pi (`ble/nus.py`). §2.1.
-2. **Nomes de tópicos MQTT** — sempre de `robo_common/topics.py`. §2.2.
+2. **Nomes de tópicos MQTT** — sempre de `roboCommon/topics.py`. §2.2.
 3. **Formato das mensagens de comando** — `{"cmd":"X"}` e `{"tipo":"…",…}`,
    documentado em `docs/contrato-mqtt.md`.
 4. **Contrato da API** — rotas e formato em `cloud/api/` consumidas

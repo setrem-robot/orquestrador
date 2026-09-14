@@ -21,7 +21,7 @@ const size_t MAX_LINE = 512;
 const char LINE_DELIMITER = '\n';
 
 // UUIDs do serviço Nordic UART Service (NUS). Mudou aqui, muda em
-// `robot_connection.dart` também.
+// `robotConnection.dart` também.
 #define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define RX_CHARACTERISTIC_UUID "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  // celular escreve
 #define TX_CHARACTERISTIC_UUID "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // ESP32 notifica

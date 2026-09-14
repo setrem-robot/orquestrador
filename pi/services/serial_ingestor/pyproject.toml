@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-serial-ingestor = "serial_ingestor.main:main"
+serial-ingestor = "serialIngestor.main:main"
 
 [build-system]
 requires = ["setuptools>=68"]

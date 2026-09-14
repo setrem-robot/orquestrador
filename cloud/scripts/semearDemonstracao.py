@@ -7,19 +7,19 @@ mostrar. Este script separa essas três coisas.
 
 Ele grava **direto no banco**, o que é o atalho: enche horas de histórico num
 instante. O que ele *não* prova é o encanamento — se o broker, o ingestor e os
-tópicos estão certos. Para isso existe o `robo-falso.py`, que publica no MQTT e
+tópicos estão certos. Para isso existe o `roboFalso.py`, que publica no MQTT e
 deixa a corrente inteira funcionar.
 
-O que se gera aqui é plausível, não aleatório: ver `telemetria_falsa.py`.
+O que se gera aqui é plausível, não aleatório: ver `telemetriaFalsa.py`.
 
 Uso, na VM ou na sua máquina:
 
-    python3 cloud/scripts/semear-demonstracao.py --horas 6
-    python3 cloud/scripts/semear-demonstracao.py --limpar     # tira tudo
+    python3 cloud/scripts/semearDemonstracao.py --horas 6
+    python3 cloud/scripts/semearDemonstracao.py --limpar     # tira tudo
 
 Ou apontando para outro banco:
 
-    PGHOST=127.0.0.1 PGPASSWORD=... python3 cloud/scripts/semear-demonstracao.py
+    PGHOST=127.0.0.1 PGPASSWORD=... python3 cloud/scripts/semearDemonstracao.py
 
 Os registros são marcados com `"demo": true` no payload — é o que torna
 `--limpar` seguro: ele nunca apaga telemetria de verdade.
@@ -33,7 +33,7 @@ import os
 
 import psycopg
 
-import telemetria_falsa as falsa
+import telemetriaFalsa as falsa
 
 
 def conexao() -> psycopg.Connection:
@@ -92,7 +92,7 @@ def main() -> None:
     quantos = semear(argumentos.horas)
     print(f"Gravados {quantos} registros cobrindo as últimas {argumentos.horas:g} horas.")
     print("Confira com:  curl -H 'Authorization: Bearer SEU_TOKEN' localhost:8000/v1/estado")
-    print("Para remover: python3 cloud/scripts/semear-demonstracao.py --limpar")
+    print("Para remover: python3 cloud/scripts/semearDemonstracao.py --limpar")
 
 
 if __name__ == "__main__":

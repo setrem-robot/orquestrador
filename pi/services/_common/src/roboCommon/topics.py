@@ -9,7 +9,7 @@ em um único lugar. Este módulo é o reflexo, em código, do docs/contrato-mqtt
 ROOT = "robo"
 
 # --- Comandos vindos do mundo externo (app de celular via ESP32) ---
-# O serial_ingestor publica AQUI tudo que chega do Bluetooth, sem interpretar.
+# O serialIngestor publica AQUI tudo que chega do Bluetooth, sem interpretar.
 # O orquestrador assina este tópico e decide o roteamento.
 COMANDO_ENTRADA = f"{ROOT}/comando/entrada"
 

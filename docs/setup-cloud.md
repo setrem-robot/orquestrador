@@ -328,8 +328,8 @@ mostra tela vazia — e tela vazia não distingue "o mapa está errado" de "não
 o que mostrar". Este script separa as duas coisas:
 
 ```bash
-python3 cloud/scripts/semear-demonstracao.py --horas 6
-python3 cloud/scripts/semear-demonstracao.py --limpar
+python3 cloud/scripts/semearDemonstracao.py --horas 6
+python3 cloud/scripts/semearDemonstracao.py --limpar
 ```
 
 Ele gera um trajeto em volta do campus com velocidade coerente, uma bateria que

@@ -4,7 +4,7 @@ Roda na MESMA VM do broker remoto. Assina robo/telemetria/# (tudo que a
 bridge do Pi replicou para a nuvem) e grava cada mensagem numa hypertable do
 TimescaleDB. É o ponto onde a telemetria efêmera vira histórico consultável.
 
-Mantém-se deliberadamente independente da lib robo_common do Pi: a nuvem é um
+Mantém-se deliberadamente independente da lib roboCommon do Pi: a nuvem é um
 ecossistema separado e auto-contido. A única "interface" compartilhada é o
 nome do tópico (robo/telemetria/<tipo>), que é estável.
 

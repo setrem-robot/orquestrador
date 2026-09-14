@@ -1,6 +1,6 @@
 """Um robô que não existe, publicando no MQTT como se existisse.
 
-A diferença para o `semear-demonstracao.py` é o caminho percorrido. Aquele
+A diferença para o `semearDemonstracao.py` é o caminho percorrido. Aquele
 grava direto no banco — rápido, e prova só que a API sabe ler. Este publica no
 broker e deixa a corrente inteira funcionar:
 
@@ -13,9 +13,9 @@ errada, ingestor sem assinar o tópico, `ts` no formato que o banco não aceita.
 
 Uso:
 
-    python3 cloud/scripts/robo-falso.py                 publica a cada segundo
-    python3 cloud/scripts/robo-falso.py --rapido        dez vezes mais rápido
-    python3 cloud/scripts/robo-falso.py --host 192.168.1.102
+    python3 cloud/scripts/roboFalso.py                 publica a cada segundo
+    python3 cloud/scripts/roboFalso.py --rapido        dez vezes mais rápido
+    python3 cloud/scripts/roboFalso.py --host 192.168.1.102
 
 Ctrl-C encerra. Requer `paho-mqtt` (`pip install paho-mqtt`).
 """
@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 
-import telemetria_falsa as falsa
+import telemetriaFalsa as falsa
 
 #: De quantos em quantos ciclos cada grandeza é publicada. O robô de verdade
 #: não publica tudo na mesma cadência: a posição muda a todo instante, e a

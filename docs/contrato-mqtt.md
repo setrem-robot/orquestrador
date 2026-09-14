@@ -2,7 +2,7 @@
 
 Este documento é a fonte da verdade dos tópicos e formatos de mensagem que os
 serviços trocam pelo broker local. O módulo
-[`robo_common/topics.py`](../pi/services/_common/src/robo_common/topics.py) é o
+[`roboCommon/topics.py`](../pi/services/_common/src/roboCommon/topics.py) é o
 reflexo, em código, deste contrato — sempre que mudar um tópico, mude nos dois
 lugares.
 
@@ -16,7 +16,7 @@ App (celular)
    ▼
 ESP32  ──(valida JSON, repassa por serial)──►  Pi
                                                  │
-                          serial_ingestor ──► robo/comando/entrada
+                          serialIngestor ──► robo/comando/entrada
                                                  │
                                           orquestrador (roteia)
                               ┌──────────────────┼───────────────────┐
@@ -37,7 +37,7 @@ nuvem e persistido**. Quem decide o que entra nesse prefixo é o orquestrador.
 ## Comandos (entram do mundo externo)
 
 ### `robo/comando/entrada`
-Publicado pelo `serial_ingestor` com o JSON cru recebido do app, sem
+Publicado pelo `serialIngestor` com o JSON cru recebido do app, sem
 interpretação. Assinado pelo `orquestrador`.
 
 O orquestrador aceita dois formatos (ambos convivem sem conflito):
@@ -114,7 +114,7 @@ São três camadas independentes, e cada uma cobre o que a anterior não alcanç
 | Camada | Cobre | Onde |
 |---|---|---|
 | App repete o comando | qualquer falha no caminho, inclusive as de baixo | `robotConnection.dart::send` |
-| ESP32 manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `esp32_ble_bridge.ino::onDisconnect` |
+| ESP32 manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `esp32BleBridge.ino::onDisconnect` |
 | Motores param sem comando por 1 s | ESP32 travado, serial solta, Pi sem receber | `motores/vigia.py` |
 
 `COMANDO_TIMEOUT_S=0` desliga a terceira camada. **Só faça isso com um app que
@@ -124,7 +124,7 @@ app antigo com um Pi atualizado tem exatamente esse sintoma, e o log do serviço
 
 > **Tudo entra por um único caminho.** O app só tem um canal Bluetooth: o
 > ESP32. Não há Bluetooth no Pi. Logo, até a credencial de Wi-Fi viaja como um
-> comando comum (app → ESP32 → serial → `serial_ingestor`).
+> comando comum (app → ESP32 → serial → `serialIngestor`).
 
 ## Domínio (saída do orquestrador)
 

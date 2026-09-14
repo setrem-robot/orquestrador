@@ -80,7 +80,7 @@ antigos, falha parcial, recuperação, ausência do mapa e consultas concorrente
 |---|---|
 | `index.html` | Conteúdo institucional |
 | `painel/index.html` | Estrutura da tela de consulta |
-| `ao-vivo.js` | Consulta, estados, mapa e apresentação dos registros |
+| `aoVivo.js` | Consulta, estados, mapa e apresentação dos registros |
 | `config.js` | Prefixo da API e intervalo de consulta |
 | `estilo.css` | Identidade visual compartilhada e responsividade |
 | `assets/atlas.png` | Identidade original da Atlas, reutilizada do projeto |

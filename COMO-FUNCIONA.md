@@ -39,7 +39,7 @@ flowchart LR
     subgraph ROBO["NO ROBO"]
         direction TB
         PONTE["Ponte BLE<br/>ESP32 ou o proprio Pi"]
-        ING["serial_ingestor<br/>so quando a ponte e o ESP32"]
+        ING["serialIngestor<br/>so quando a ponte e o ESP32"]
         BROKER[("mosquitto<br/>127.0.0.1:1883")]
         ORQ["orquestrador<br/>o roteador"]
         MOT["motores"]
@@ -95,8 +95,8 @@ Alguém encosta o dedo no botão **FRENTE** do app:
 | # | Onde | O que acontece |
 |---|---|---|
 | 1 | App | Escreve `{"cmd":"F"}\n` na característica BLE. E **repete a cada 300 ms** enquanto o dedo estiver no botão (ver [§6](#6-segurança-de-movimento-três-camadas-independentes)). |
-| 2 | Ponte | O ESP32 (`esp32_ble_bridge.ino`) ou o próprio Pi valida que é JSON e repassa. **Não interpreta**: não sabe o que é `"F"`. |
-| 3 | `serial_ingestor` | Só existe quando a ponte é o ESP32. Lê linhas da serial e publica cada uma em `robo/comando/entrada`, sem interpretar. |
+| 2 | Ponte | O ESP32 (`esp32BleBridge.ino`) ou o próprio Pi valida que é JSON e repassa. **Não interpreta**: não sabe o que é `"F"`. |
+| 3 | `serialIngestor` | Só existe quando a ponte é o ESP32. Lê linhas da serial e publica cada uma em `robo/comando/entrada`, sem interpretar. |
 | 4 | `orquestrador/roteador.py` | Traduz. `{"cmd":"F"}` vira `{"acao":"frente","velocidade":60}` em `robo/motores/comando`. É aqui que a entrada não-confiável é validada e saturada. |
 | 5 | `motores/main.py` | Recebe pela thread do MQTT, sob cadeado. |
 | 6 | `motores/cinematica.py` | `"frente"` vira `Velocidades(esquerda=1.0, direita=1.0)`. A `Rampa` acelera até lá sem tranco. |
@@ -122,18 +122,18 @@ E o caminho de volta, da posição do GPS até o gráfico no celular:
 ### `pi/services/` — os seis serviços
 
 Cada um tem o seu `pyproject.toml`, roda como um serviço systemd separado, e
-compartilha só a biblioteca `robo_common`.
+compartilha só a biblioteca `roboCommon`.
 
 | Serviço | Assina | Publica | O que faz |
 |---|---|---|---|
-| **`serial_ingestor`** | — | `robo/comando/entrada` | Lê linhas da serial do ESP32 e repassa. Nada mais. |
+| **`serialIngestor`** | — | `robo/comando/entrada` | Lê linhas da serial do ESP32 e repassa. Nada mais. |
 | **`orquestrador`** | `robo/comando/entrada` + os tópicos vivos | `robo/{motores,voz,wifi,rota}/comando` + `robo/telemetria/*` | Roteia comandos e espelha telemetria. |
 | **`motores`** | `robo/motores/comando` | `robo/motores/status` | Executa o movimento. |
 | **`gps`** | — | `robo/gps/posicao` | Lê NMEA e publica posição. |
 | **`wifi`** | `robo/wifi/comando` | `robo/sistema/wifi` | Provisiona rede com o `nmcli`. Roda como root. |
 | **`telemetria`** | — | `robo/telemetria/sistema` | Publica a saúde do próprio Pi (temperatura, CPU, memória, disco, rede, `throttled`). É o único já instalado no robô de produção. |
 
-### `robo_common/` — a biblioteca compartilhada
+### `roboCommon/` — a biblioteca compartilhada
 
 Dois arquivos, e os dois valem a leitura:
 
@@ -231,11 +231,11 @@ ofereceu SPP para apps de terceiros.
 ## 5. O barramento MQTT, em uma tabela
 
 Esta é a espinha do repositório. A fonte de verdade é
-[`robo_common/topics.py`](./pi/services/_common/src/robo_common/topics.py).
+[`roboCommon/topics.py`](./pi/services/_common/src/roboCommon/topics.py).
 
 | Tópico | Quem publica | Quem consome | Conteúdo |
 |---|---|---|---|
-| `robo/comando/entrada` | ponte BLE ou `serial_ingestor` | `orquestrador` | o JSON cru vindo do app |
+| `robo/comando/entrada` | ponte BLE ou `serialIngestor` | `orquestrador` | o JSON cru vindo do app |
 | `robo/motores/comando` | `orquestrador` | `motores` | `{"acao":"mover","linear":…,"angular":…}` |
 | `robo/motores/status` | `motores` | telemetria | estado dos motores (retained) |
 | `robo/gps/posicao` | `gps` | telemetria | posição atual (retained) |
@@ -313,7 +313,7 @@ python3 -m pip install -r requirements-dev.txt   # httpx: o TestClient roda nele
 python3 -m unittest discover -s tests                                                                 # 37
 ```
 
-**Sem dados para testar a nuvem?** `cloud/scripts/semear-demonstracao.py` enche
+**Sem dados para testar a nuvem?** `cloud/scripts/semearDemonstracao.py` enche
 o banco com um trajeto plausível em volta do campus, bateria descarregando e
 comandos de motor coerentes com a curva. Tudo marcado com `"demo": true`, que é
 o que faz `--limpar` nunca tocar em telemetria de verdade.

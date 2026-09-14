@@ -107,7 +107,7 @@ Duas ideias explicam quase todo o desenho:
 **Ninguém fala direto com ninguém.** Tudo passa pelo MQTT, e cada serviço só
 conhece os tópicos de que precisa. Trocar o driver do motor não toca no GPS;
 trocar o transporte do celular não toca em nenhum dos dois. Os nomes dos tópicos
-vivem num lugar só — `pi/services/_common/src/robo_common/topics.py` — e o
+vivem num lugar só — `pi/services/_common/src/roboCommon/topics.py` — e o
 formato de cada mensagem está em [`docs/contrato-mqtt.md`](./docs/contrato-mqtt.md).
 
 **A API nunca escreve.** Quem grava é o ingestor. A API roda com um usuário do
@@ -199,7 +199,7 @@ instalados num ambiente compartilhado e rodando como serviço do systemd:
 | `motores` | cinemática, rampa de aceleração e os drivers TMC2209 |
 | `gps` | lê o módulo e publica posição |
 | `wifi` | troca de rede sem cabo nem teclado |
-| `serial_ingestor` | recebe do ESP32 pela serial (herdado; hoje o BLE roda no próprio Pi) |
+| `serialIngestor` | recebe do ESP32 pela serial (herdado; hoje o BLE roda no próprio Pi) |
 
 Os motores são três camadas, e **as duas de baixo rodam sem robô**: a cinemática
 é matemática pura, e o acionamento tem uma implementação simulada

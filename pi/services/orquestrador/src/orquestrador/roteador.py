@@ -4,7 +4,7 @@ Este módulo NÃO conhece MQTT: ele só transforma um comando (dict já
 desserializado) numa lista de publicações (tópico, payload). Isso o torna
 trivial de testar e mantém a lógica de decisão separada da infraestrutura.
 
-Formatos de entrada aceitos (Bluetooth -> ESP32 -> serial_ingestor):
+Formatos de entrada aceitos (Bluetooth -> ESP32 -> serialIngestor):
 
   Formato compacto (app atual):
     {"cmd": "F"}   frente     {"cmd": "B"}   trás
@@ -35,7 +35,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
-from robo_common import topics
+from roboCommon import topics
 
 logger = logging.getLogger(__name__)
 

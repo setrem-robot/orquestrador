@@ -36,8 +36,8 @@ import threading
 import time
 from typing import Any
 
-from robo_common import topics
-from robo_common.mqttClient import MqttService
+from roboCommon import topics
+from roboCommon.mqttClient import MqttService
 
 from .acionamento import Acionamento, criarAcionamento
 from .cinematica import ACOES_VALIDAS, Rampa, Velocidades, doComando

@@ -24,10 +24,10 @@ comando de direção chega em `robo/comando/entrada` e para ali.
   repassa, não interpreta comandos.
 - **`pi/services/`** — seis serviços Python independentes, cada um seu
   próprio `pyproject.toml`, todos instalados num venv compartilhado
-  (`pi/scripts/install.sh`) e rodando como serviço systemd: `serial_ingestor`,
+  (`pi/scripts/install.sh`) e rodando como serviço systemd: `serialIngestor`,
   `orquestrador` (o roteador), `motores`, `gps`, `wifi` e `telemetria` (saúde
   do Pi → `robo/telemetria/sistema`; o único já instalado no robô de produção).
-  Compartilham a lib `robo_common` (tópicos MQTT + `MqttService`).
+  Compartilham a lib `roboCommon` (tópicos MQTT + `MqttService`).
 - **`cloud/`** — Mosquitto remoto + `ingestor` + TimescaleDB + **`api`** +
   **`cloudflared`**, via Docker Compose. Os três primeiros são o caminho de ida
   (robô → banco); os dois últimos são o de volta, que faltava: um celular não
@@ -69,14 +69,14 @@ operador `->>` não aceitam parâmetro para eles. Por isso o primeiro vem de uma
 lista fechada (`INTERVALOS`) e o segundo passa por `campoValido()`. Ao mexer
 ali, essa validação é a única coisa entre o cliente e uma injeção.
 
-**Sem dados para testar?** `cloud/scripts/semear-demonstracao.py` enche o banco
+**Sem dados para testar?** `cloud/scripts/semearDemonstracao.py` enche o banco
 com um trajeto plausível em volta do campus, bateria descarregando e comandos
 de motor coerentes com a curva. Tudo marcado com `"demo": true`, que é o que
 faz `--limpar` nunca tocar em telemetria de verdade.
 
 ## BLE, não Bluetooth Classic
 
-O firmware em `esp32/esp32_ble_bridge/` substituiu `esp32/esp32_bt_bridge/`
+O firmware em `esp32/esp32BleBridge/` substituiu `esp32/esp32_bt_bridge/`
 (removido). Motivo: o app Flutter agora roda em iOS também, e o iOS nunca
 ofereceu Bluetooth Classic (SPP) para apps de terceiros. Os UUIDs do serviço
 BLE (padrão Nordic UART Service, no topo do `.ino`) **precisam bater** com
@@ -150,7 +150,7 @@ cd pi/services/wifi && PYTHONPATH="src:../_common/src" python -m unittest discov
 
 ## Já orientado a objetos, sem precisar de refactor
 
-`robo_common/mqttClient.py::MqttService`, `gps/main.py::Posicao` e
+`roboCommon/mqttClient.py::MqttService`, `gps/main.py::Posicao` e
 `cloud/ingestor/main.py::Ingestor` já são classes com boa encapsulação (estado
 privado, API pública enxuta). Não têm herança/polimorfismo — fora
 `wifi/rede.py::ErroRede(Exception)` e o que foi adicionado em `roteador.py` e
@@ -189,5 +189,5 @@ cd pi/services/motores && PYTHONPATH="src:../_common/src" python -m unittest dis
 
 Sem hardware real aqui (sem ESP32 conectado, sem Raspberry Pi, sem steppers).
 `roteador.py` e as duas camadas de baixo de `motores/` são testáveis porque não
-tocam hardware; `gps`, `wifi` e o `serial_ingestor` só são validáveis de verdade
+tocam hardware; `gps`, `wifi` e o `serialIngestor` só são validáveis de verdade
 no Pi físico ou com mocks que ninguém escreveu ainda.

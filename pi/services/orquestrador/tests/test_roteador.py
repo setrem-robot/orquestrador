@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import unittest
 
-from robo_common import topics
+from roboCommon import topics
 
 from orquestrador.roteador import (
     ComandoMotor,

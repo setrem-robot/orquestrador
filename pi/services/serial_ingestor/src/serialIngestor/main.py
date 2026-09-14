@@ -1,4 +1,4 @@
-"""serial_ingestor — ponte ESP32 (serial) -> MQTT local.
+"""serialIngestor — ponte ESP32 (serial) -> MQTT local.
 
 Responsabilidade ÚNICA: ler linhas NDJSON que o ESP32 envia pela serial,
 validar que são JSON, e publicar cada uma no tópico de entrada de comandos
@@ -23,17 +23,17 @@ import time
 
 import serial  # pyserial
 
-from robo_common import topics
-from robo_common.mqttClient import MqttService
+from roboCommon import topics
+from roboCommon.mqttClient import MqttService
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("serial_ingestor")
+logger = logging.getLogger("serialIngestor")
 
 # --- Configuração ---
-SERVICO = "serial_ingestor"
+SERVICO = "serialIngestor"
 SERIAL_PORT = os.environ.get("SERIAL_PORT", "/dev/ttyUSB0")
 SERIAL_BAUD = int(os.environ.get("SERIAL_BAUD", "115200"))
 MQTT_HOST = os.environ.get("MQTT_HOST", "127.0.0.1")
