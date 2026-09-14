@@ -188,7 +188,7 @@ Para entender cada repositório por dentro, há um passeio guiado em cada um:
   o **próprio Pi** (`../RobotEye/src/roboteye/ble/`). Qualquer um dos dois valida o
   JSON e publica em `robo/comando/entrada`. **Só um deve estar ativo por vez.**
 - **⚠️ Contrato que precisa bater nos dois lados:** os UUIDs do serviço BLE.
-  - App: `RobotBleIds` em `../app/lib/services/robot_connection.dart`
+  - App: `RobotBleIds` em `../app/lib/services/robotConnection.dart`
     (`serviceUuid = 6e400001-b5a3-f393-e0a9-e50e24dcca9e`, RX `…0002`, TX `…0003`).
   - ESP32: no topo de `esp32/esp32_ble_bridge/*.ino`.
   - Pi: `../RobotEye/src/roboteye/ble/nus.py`.
@@ -227,7 +227,7 @@ Para entender cada repositório por dentro, há um passeio guiado em cada um:
   usuário de banco só-`SELECT`). É o **caminho de volta** (banco → celular).
 - **Duas portas:** `/v1/...` (exige `Authorization: Bearer`, serve tudo) e
   `/v1/publico/...` (sem token, serve menos — resumo e trajeto arredondado).
-- **Cliente no app:** `../app/lib/services/telemetry_api.dart` (o único arquivo do
+- **Cliente no app:** `../app/lib/services/telemetryApi.dart` (o único arquivo do
   app que sabe o que é uma requisição HTTP). Endereço e token em
   `SharedPreferences` (tela de ajustes) ou por `--dart-define`.
 - **Contrato:** `cloud/api/` e `docs/setup-cloud.md`.
@@ -266,8 +266,8 @@ orquestrador: ComandoRota valida cada mensagem (coordenada no planeta? índice o
 robo/rota/comando   →   (nenhum consumidor hoje — gancho para navegação futura)
 ```
 
-- **App:** `../app/lib/models/rota_segura.dart` (modelo + cerca + fatiamento),
-  `rota_segura_screen.dart` (desenhar no mapa OSM), `rota_store.dart` (persistir).
+- **App:** `../app/lib/models/rotaSegura.dart` (modelo + cerca + fatiamento),
+  `rotaSeguraScreen.dart` (desenhar no mapa OSM), `rotaStore.dart` (persistir).
   Só o `RobotConnection.enviarRota` fala com o rádio.
 - **Orquestrador:** `ComandoRota` em `pi/services/orquestrador/src/orquestrador/roteador.py`,
   tópico `ROTA_COMANDO` em `topics.py`, contrato em `docs/contrato-mqtt.md`.
@@ -288,7 +288,7 @@ Estes são os pontos onde **mudar um lado sem o outro quebra em silêncio**:
 3. **Formato das mensagens de comando** — `{"cmd":"X"}` e `{"tipo":"…",…}`,
    documentado em `docs/contrato-mqtt.md`.
 4. **Contrato da API** — rotas e formato em `cloud/api/` consumidas
-   por `../app/lib/services/telemetry_api.dart` e pelo `site/`.
+   por `../app/lib/services/telemetryApi.dart` e pelo `site/`.
 
 ---
 

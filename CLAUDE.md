@@ -66,7 +66,7 @@ com uma mensagem sobre `httpx`, que não é o que está faltando.
 
 **O `intervalo` e o `campo` são interpolados no SQL** — `time_bucket` e o
 operador `->>` não aceitam parâmetro para eles. Por isso o primeiro vem de uma
-lista fechada (`INTERVALOS`) e o segundo passa por `campo_valido()`. Ao mexer
+lista fechada (`INTERVALOS`) e o segundo passa por `campoValido()`. Ao mexer
 ali, essa validação é a única coisa entre o cliente e uma injeção.
 
 **Sem dados para testar?** `cloud/scripts/semear-demonstracao.py` enche o banco
@@ -80,7 +80,7 @@ O firmware em `esp32/esp32_ble_bridge/` substituiu `esp32/esp32_bt_bridge/`
 (removido). Motivo: o app Flutter agora roda em iOS também, e o iOS nunca
 ofereceu Bluetooth Classic (SPP) para apps de terceiros. Os UUIDs do serviço
 BLE (padrão Nordic UART Service, no topo do `.ino`) **precisam bater** com
-`RobotBleIds` em `../app/lib/services/robot_connection.dart`. A validação de
+`RobotBleIds` em `../app/lib/services/robotConnection.dart`. A validação de
 JSON e o formato de mensagem (`{"cmd":"F"}\n`) continuam idênticos — só o
 transporte mudou.
 
@@ -106,7 +106,7 @@ mesmo vigia e no mesmo acionamento. Sem exclusão mútua, um `tick()` que já
 estava em curso pode aplicar, **depois** de uma parada de emergência, a
 velocidade que tinha lido antes dela — o robô recebe "pare" e continua andando.
 `ServicoMotores` serializa as duas entradas com um `RLock` (reentrante porque
-`tick()` chama `parada_de_emergencia()`, que também tranca), e
+`tick()` chama `paradaDeEmergencia()`, que também tranca), e
 `tests/test_concorrencia.py` prova que ninguém entra na região crítica no meio
 de um `aplicar`.
 
@@ -131,7 +131,7 @@ pip install -e pi/services/_common -e pi/services/orquestrador
 cd pi/services/orquestrador && python -m unittest discover -s tests -v
 ```
 
-**O que ainda não foi refatorado:** unificar o `_parar`/`_tratar_sinal`
+**O que ainda não foi refatorado:** unificar o `_parar`/`tratarSinal`
 duplicado nos 5 `main.py`, e dar classes a `wifi/rede.py`. Ficam documentados
 aqui como próximo passo, não como pendência esquecida — e o caminho já está
 aberto: foi exatamente assim que os motores deixaram de precisar do robô
@@ -139,7 +139,7 @@ montado (ver abaixo).
 
 **`wifi/rede.py` já tem teste**, e a linha que dizia o contrário estava errada:
 o que precisa de Raspberry Pi é falar com o `nmcli`, não decidir *se* vai falar.
-`processar()` recebe um dict do app e devolve outro; trocando `_run_nmcli` por
+`processar()` recebe um dict do app e devolve outro; trocando `runNmcli` por
 um dublê, os 16 testes de `pi/services/wifi/tests/` cobrem a validação inteira —
 que é a parte que importa, porque esse comando chega por um rádio BLE que não
 pede senha a ninguém.
@@ -150,7 +150,7 @@ cd pi/services/wifi && PYTHONPATH="src:../_common/src" python -m unittest discov
 
 ## Já orientado a objetos, sem precisar de refactor
 
-`robo_common/mqtt_client.py::MqttService`, `gps/main.py::Posicao` e
+`robo_common/mqttClient.py::MqttService`, `gps/main.py::Posicao` e
 `cloud/ingestor/main.py::Ingestor` já são classes com boa encapsulação (estado
 privado, API pública enxuta). Não têm herança/polimorfismo — fora
 `wifi/rede.py::ErroRede(Exception)` e o que foi adicionado em `roteador.py` e

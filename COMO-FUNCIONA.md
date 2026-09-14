@@ -140,7 +140,7 @@ Dois arquivos, e os dois valem a leitura:
 - **`topics.py`** — todo nome de tópico MQTT do projeto, num lugar só. É o
   reflexo em código do `docs/contrato-mqtt.md`. **Nunca escreva o nome de um
   tópico à mão em outro arquivo.**
-- **`mqtt_client.py`** — o `MqttService`, que embrulha o paho com o que todo
+- **`mqttClient.py`** — o `MqttService`, que embrulha o paho com o que todo
   serviço precisa: reconexão automática, re-inscrição depois de cair, JSON
   inválido descartado sem derrubar o serviço, e **Last Will** — se o processo
   morrer sem avisar, o broker publica “offline” por ele.
@@ -291,7 +291,7 @@ testes rodarem em menos de um segundo, sem broker, sem banco e sem robô.
 
 **4. O app é entrada não-confiável.** Ele atravessa um rádio que não pede senha.
 Tudo que vem dele é validado e saturado antes de virar movimento ou consulta —
-`limitar()`, `_limitar_eixo()`, `campo_valido()`, `INTERVALOS`.
+`limitar()`, `limitarEixo()`, `campoValido()`, `INTERVALOS`.
 
 ---
 

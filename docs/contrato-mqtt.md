@@ -113,7 +113,7 @@ São três camadas independentes, e cada uma cobre o que a anterior não alcanç
 
 | Camada | Cobre | Onde |
 |---|---|---|
-| App repete o comando | qualquer falha no caminho, inclusive as de baixo | `robot_connection.dart::send` |
+| App repete o comando | qualquer falha no caminho, inclusive as de baixo | `robotConnection.dart::send` |
 | ESP32 manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `esp32_ble_bridge.ino::onDisconnect` |
 | Motores param sem comando por 1 s | ESP32 travado, serial solta, Pi sem receber | `motores/vigia.py` |
 
@@ -197,7 +197,7 @@ A API de leitura (`cloud/api/`) serve esse histórico. A rota `GET
 /v1/serie/<tipo>` aceita `campo` **aninhado**, com pontos (`cpu.uso_pct`,
 `memoria.uso_pct`): a saúde do Pi guarda os números dentro de blocos, e a
 consulta navega pelo payload (`payload->'cpu'->>'uso_pct'`) para dar histórico
-deles. Cada segmento passa por `campo_valido()` antes de entrar no SQL.
+deles. Cada segmento passa por `campoValido()` antes de entrar no SQL.
 
 ## Provisionamento de Wi-Fi
 

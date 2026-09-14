@@ -307,7 +307,7 @@ máquina ligada.
 o escuta: o repositório da cara ainda não reage a MQTT. Do mesmo jeito, ela não
 sabe a própria bateria — `robo/telemetria/bateria` também não tem ouvinte.
 
-**Refatorações conhecidas.** O `_parar`/`_tratar_sinal` está duplicado nos seis
+**Refatorações conhecidas.** O `_parar`/`tratarSinal` está duplicado nos seis
 `main.py`, e `wifi/rede.py` ainda é função solta em vez de classe. Ficam
 registradas aqui como próximo passo, não como pendência esquecida.
 
