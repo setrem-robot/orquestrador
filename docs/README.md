@@ -29,6 +29,8 @@ quinze minutos. Aqui ficam os detalhes, separados por onde a coisa roda.
 - [**ESP32 — removido**](./setup-esp32.md) — o ESP32 saiu do projeto; a ponte
   Bluetooth foi centralizada no próprio Pi (no [repositório da
   cara](https://github.com/setrem-robot/atlas_ai_v2)).
+- [**Plano — motores por ponte H**](./plano-ponte-h.md) — estudo e plano para
+  acionar motores DC por ponte H (gpiozero), encaixando no serviço `motores`.
 
 ## Fora deste repositório
 
