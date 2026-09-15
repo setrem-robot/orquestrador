@@ -349,6 +349,7 @@ para confirmar.
 | [`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md) | As fronteiras entre os três repositórios, e o que está no ar hoje |
 | [`docs/contrato-mqtt.md`](./docs/contrato-mqtt.md) | O formato exato de cada mensagem |
 | [`docs/setup-pi.md`](./docs/setup-pi.md) | Instalar os serviços no Raspberry Pi |
+| [`docs/setup-gps.md`](./docs/setup-gps.md) | Ligar o GPS (GY-GPS6MV2 / NEO-6M) na UART do Pi |
 | [`docs/setup-cloud.md`](./docs/setup-cloud.md) | Subir o broker, o banco, a API e o túnel |
 | [`docs/setup-esp32.md`](./docs/setup-esp32.md) | ESP32 removido — a ponte BLE foi centralizada no Pi |
 | [`CLAUDE.md`](./CLAUDE.md) | Convenções do repositório |

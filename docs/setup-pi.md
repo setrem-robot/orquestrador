@@ -47,7 +47,7 @@ Serviços instalados:
 |-------------------|--------------------------------------------------------|
 | `orquestrador`    | Roteia comandos e espelha telemetria para a nuvem.     |
 | `motores`         | Executa o movimento (`robo/motores/comando` → drivers TMC2209). |
-| `gps`             | Lê NMEA do GPS → `robo/gps/posicao`.                    |
+| `gps`             | Lê NMEA do GPS → `robo/gps/posicao`. Ligação física em [`setup-gps.md`](./setup-gps.md). |
 | `wifi`            | Aplica credencial de Wi-Fi (comando MQTT) → `robo/sistema/wifi`. |
 | `telemetria`      | Publica a saúde do próprio Pi → `robo/telemetria/sistema`. |
 

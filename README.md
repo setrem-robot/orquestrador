@@ -272,6 +272,7 @@ cd cloud/api && python3 -m pytest -q tests/  # 27 testes
 | [`docs/ambiente-local.md`](./docs/ambiente-local.md) | a nuvem inteira na sua máquina, e como levar para a VM |
 | [`docs/setup-cloud.md`](./docs/setup-cloud.md) | a VM: broker, banco, ingestor, API e o túnel da Cloudflare |
 | [`docs/setup-pi.md`](./docs/setup-pi.md) | o Raspberry Pi: dependências, serviços e broker local |
+| [`docs/setup-gps.md`](./docs/setup-gps.md) | ligar o GPS (GY-GPS6MV2 / NEO-6M) na UART do Pi |
 | [`docs/setup-esp32.md`](./docs/setup-esp32.md) | ESP32 removido — a ponte BLE foi centralizada no Pi |
 | [`site/README.md`](./site/README.md) | publicar a landing page |
 
