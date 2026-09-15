@@ -1,8 +1,7 @@
 """wifi — aplica a configuração de Wi-Fi recebida pelo barramento de comandos.
 
-O Pi NÃO fala Bluetooth: o ESP32 é o único gateway. A credencial chega como
-qualquer outro comando — app -> ESP32 (Bluetooth) -> serial -> serialIngestor
--> robo/comando/entrada -> o orquestrador roteia {"tipo":"wifi"} para
+A credencial chega como qualquer outro comando — app -> Bluetooth -> Pi ->
+robo/comando/entrada -> o orquestrador roteia {"tipo":"wifi"} para
 robo/wifi/comando. Este serviço assina esse tópico, aplica com o nmcli e
 publica o estado da conexão em robo/sistema/wifi (que o orquestrador espelha
 para a nuvem).

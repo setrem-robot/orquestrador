@@ -1,8 +1,7 @@
 # Setup do Ambiente no Raspberry Pi
 
 O Pi roda o **broker MQTT local** (em container) e os **serviços Python** que
-fazem a ponte com o ESP32, leem o GPS, orquestram os comandos e reportam a
-saúde do próprio Pi.
+leem o GPS, orquestram os comandos e reportam a saúde do próprio Pi.
 
 ## 1. Pré-requisitos
 
@@ -12,7 +11,7 @@ saúde do próprio Pi.
   curl -fsSL https://get.docker.com | sh
   sudo usermod -aG docker $USER   # e reabra a sessão
   ```
-- Acesso à serial (ESP32 e GPS): o usuário precisa estar no grupo `dialout`:
+- Acesso à serial (GPS): o usuário precisa estar no grupo `dialout`:
   ```bash
   sudo usermod -aG dialout $USER  # e reabra a sessão
   ```
@@ -46,7 +45,6 @@ Serviços instalados:
 
 | Serviço           | O que faz                                              |
 |-------------------|--------------------------------------------------------|
-| `serial-ingestor` | Lê NDJSON da serial do ESP32 → `robo/comando/entrada`. |
 | `orquestrador`    | Roteia comandos e espelha telemetria para a nuvem.     |
 | `motores`         | Executa o movimento (`robo/motores/comando` → drivers TMC2209). |
 | `gps`             | Lê NMEA do GPS → `robo/gps/posicao`.                    |
@@ -56,7 +54,6 @@ Serviços instalados:
 ### Rodar manualmente (para testar)
 
 ```bash
-SERIAL_PORT=/dev/ttyUSB0 pi/.venv/bin/serial-ingestor
 pi/.venv/bin/orquestrador
 MOTORES_BACKEND=simulado pi/.venv/bin/motores   # simulado: sem GPIO, só loga
 GPS_PORT=/dev/serial0 pi/.venv/bin/gps
@@ -70,23 +67,22 @@ Cada serviço tem um unit em `pi/systemd/`. Ajuste `User` e os caminhos se o
 repo não estiver em `/home/setrem/setrem-robot`, depois:
 
 ```bash
-sudo cp pi/systemd/robo-serial-ingestor.service /etc/systemd/system/
 sudo cp pi/systemd/robo-orquestrador.service     /etc/systemd/system/
 sudo cp pi/systemd/robo-motores.service          /etc/systemd/system/
 sudo cp pi/systemd/robo-gps.service              /etc/systemd/system/
 sudo cp pi/systemd/robo-wifi.service             /etc/systemd/system/
 sudo cp pi/systemd/robo-telemetria.service       /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now robo-serial-ingestor robo-orquestrador robo-motores robo-gps robo-wifi robo-telemetria
+sudo systemctl enable --now robo-orquestrador robo-motores robo-gps robo-wifi robo-telemetria
 journalctl -u robo-orquestrador -f
 ```
 
 ## 3.1 Provisionamento de Wi-Fi (serviço `wifi`)
 
-O Pi **não fala Bluetooth** — o ESP32 é o único gateway. A credencial de Wi-Fi
-chega como qualquer outro comando: o app envia `{"tipo":"wifi",...}` ao ESP32,
-que repassa por serial; o orquestrador roteia para `robo/wifi/comando` e o
-serviço `wifi` aplica via `nmcli`. Por mexer na rede, o serviço roda como
+A credencial de Wi-Fi chega como qualquer outro comando: o app envia
+`{"tipo":"wifi",...}` pela ponte BLE do Pi; o orquestrador roteia para
+`robo/wifi/comando` e o serviço `wifi` aplica via `nmcli`. Por mexer na rede, o
+serviço roda como
 **root**, e precisa do NetworkManager ativo:
 
 ```bash
@@ -121,8 +117,6 @@ Você deve ver o `orquestrador` republicar em `robo/motores/comando`.
 
 | Variável                | Default        | Serviço            |
 |-------------------------|----------------|--------------------|
-| `SERIAL_PORT`           | `/dev/ttyUSB0` | serial-ingestor    |
-| `SERIAL_BAUD`           | `115200`       | serial-ingestor    |
 | `GPS_PORT`              | `/dev/serial0` | gps                |
 | `GPS_BAUD`              | `9600`         | gps                |
 | `GPS_INTERVALO_S`       | `1`            | gps                |

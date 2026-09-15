@@ -2,9 +2,9 @@
 
 O app manda `F` quando o dedo desce e `S` quando o dedo sobe. Entre os dois,
 nada. Isso quer dizer que qualquer falha enquanto o dedo está no botão — o
-celular saindo de alcance, a bateria dele acabando, o app sendo fechado, o ESP32
-travando, o cabo serial soltando — deixa o último comando valendo. O robô fica
-andando, sem ninguém no controle.
+celular saindo de alcance, a bateria dele acabando, o app sendo fechado, o
+Bluetooth caindo — deixa o último comando valendo. O robô fica andando, sem
+ninguém no controle.
 
 Existe `{"tipo":"parada_emergencia"}`, mas é um botão que alguém precisa
 apertar: não serve para o caso em que justamente o caminho até esse botão

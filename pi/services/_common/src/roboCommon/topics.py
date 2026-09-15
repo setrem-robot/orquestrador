@@ -8,8 +8,8 @@ em um único lugar. Este módulo é o reflexo, em código, do docs/contrato-mqtt
 # Raiz de todos os tópicos do robô.
 ROOT = "robo"
 
-# --- Comandos vindos do mundo externo (app de celular via ESP32) ---
-# O serialIngestor publica AQUI tudo que chega do Bluetooth, sem interpretar.
+# --- Comandos vindos do mundo externo (app de celular via BLE) ---
+# A ponte BLE do Pi publica AQUI tudo que chega do Bluetooth, sem interpretar.
 # O orquestrador assina este tópico e decide o roteamento.
 COMANDO_ENTRADA = f"{ROOT}/comando/entrada"
 

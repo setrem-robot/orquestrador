@@ -16,14 +16,17 @@
 Este repositório é **o corpo da Atlas**: o que faz o robô se mover, saber onde
 está, e guardar o histórico do que fez.
 
-São três frentes que quase não se conhecem:
+São frentes que quase não se conhecem:
 
 | Frente | Onde roda | O que é |
 |---|---|---|
-| **`esp32/`** | No microcontrolador | Firmware que faz a ponte entre o Bluetooth do celular e a serial do Pi |
 | **`pi/services/`** | No Raspberry Pi | Cinco serviços Python independentes, ligados por MQTT |
 | **`cloud/`** | Numa VM (LARCC) | Broker remoto, banco de séries temporais, API de leitura e o túnel |
 | **`site/`** | Cloudflare Pages | A landing page, HTML/CSS/JS puros |
+
+> A ponte Bluetooth que recebe os comandos do app roda no próprio Pi (no
+> repositório da cara, `RobotEye`, em `src/roboteye/ble/`). O **ESP32 que a
+> fazia foi removido** — tudo foi centralizado no Pi.
 
 A **cara** do robô — a face animada, a voz, a IA — é do outro repositório,
 [`atlas_ai_v2`](../RobotEye).
@@ -38,8 +41,7 @@ flowchart LR
 
     subgraph ROBO["NO ROBO"]
         direction TB
-        PONTE["Ponte BLE<br/>ESP32 ou o proprio Pi"]
-        ING["serialIngestor<br/>so quando a ponte e o ESP32"]
+        PONTE["Ponte BLE<br/>no proprio Pi"]
         BROKER[("mosquitto<br/>127.0.0.1:1883")]
         ORQ["orquestrador<br/>o roteador"]
         MOT["motores"]
@@ -60,9 +62,7 @@ flowchart LR
     SITE["Landing page"]
 
     APP -- "BLE, JSON por linha" --> PONTE
-    PONTE -- "serial" --> ING
-    ING --> BROKER
-    PONTE -- "MQTT direto" --> BROKER
+    PONTE -- "MQTT" --> BROKER
     BROKER --> ORQ
     ORQ -- "robo/motores/comando" --> MOT
     ORQ -- "robo/wifi/comando" --> WIFI
@@ -95,13 +95,12 @@ Alguém encosta o dedo no botão **FRENTE** do app:
 | # | Onde | O que acontece |
 |---|---|---|
 | 1 | App | Escreve `{"cmd":"F"}\n` na característica BLE. E **repete a cada 300 ms** enquanto o dedo estiver no botão (ver [§6](#6-segurança-de-movimento-três-camadas-independentes)). |
-| 2 | Ponte | O ESP32 (`esp32BleBridge.ino`) ou o próprio Pi valida que é JSON e repassa. **Não interpreta**: não sabe o que é `"F"`. |
-| 3 | `serialIngestor` | Só existe quando a ponte é o ESP32. Lê linhas da serial e publica cada uma em `robo/comando/entrada`, sem interpretar. |
-| 4 | `orquestrador/roteador.py` | Traduz. `{"cmd":"F"}` vira `{"acao":"frente","velocidade":60}` em `robo/motores/comando`. É aqui que a entrada não-confiável é validada e saturada. |
-| 5 | `motores/main.py` | Recebe pela thread do MQTT, sob cadeado. |
-| 6 | `motores/cinematica.py` | `"frente"` vira `Velocidades(esquerda=1.0, direita=1.0)`. A `Rampa` acelera até lá sem tranco. |
-| 7 | `motores/acionamento.py` | A velocidade vira frequência de uma onda quadrada no pino STEP. O motor gira sozinho enquanto ninguém mexer. |
-| 8 | `motores/vigia.py` | Em paralelo: se passar **1 segundo** sem o comando ser repetido, para tudo. Silêncio significa “pare”. |
+| 2 | Ponte BLE (no Pi) | O Pi valida que é JSON e publica em `robo/comando/entrada`. **Não interpreta**: não sabe o que é `"F"`. (Roda no repositório `RobotEye`, `src/roboteye/ble/`.) |
+| 3 | `orquestrador/roteador.py` | Traduz. `{"cmd":"F"}` vira `{"acao":"frente","velocidade":60}` em `robo/motores/comando`. É aqui que a entrada não-confiável é validada e saturada. |
+| 4 | `motores/main.py` | Recebe pela thread do MQTT, sob cadeado. |
+| 5 | `motores/cinematica.py` | `"frente"` vira `Velocidades(esquerda=1.0, direita=1.0)`. A `Rampa` acelera até lá sem tranco. |
+| 6 | `motores/acionamento.py` | A velocidade vira frequência de uma onda quadrada no pino STEP. O motor gira sozinho enquanto ninguém mexer. |
+| 7 | `motores/vigia.py` | Em paralelo: se passar **1 segundo** sem o comando ser repetido, para tudo. Silêncio significa “pare”. |
 
 E o caminho de volta, da posição do GPS até o gráfico no celular:
 
@@ -119,14 +118,13 @@ E o caminho de volta, da posição do GPS até o gráfico no celular:
 
 ## 4. As peças, uma a uma
 
-### `pi/services/` — os seis serviços
+### `pi/services/` — os cinco serviços
 
 Cada um tem o seu `pyproject.toml`, roda como um serviço systemd separado, e
 compartilha só a biblioteca `roboCommon`.
 
 | Serviço | Assina | Publica | O que faz |
 |---|---|---|---|
-| **`serialIngestor`** | — | `robo/comando/entrada` | Lê linhas da serial do ESP32 e repassa. Nada mais. |
 | **`orquestrador`** | `robo/comando/entrada` + os tópicos vivos | `robo/{motores,voz,wifi,rota}/comando` + `robo/telemetria/*` | Roteia comandos e espelha telemetria. |
 | **`motores`** | `robo/motores/comando` | `robo/motores/status` | Executa o movimento. |
 | **`gps`** | — | `robo/gps/posicao` | Lê NMEA e publica posição. |
@@ -217,14 +215,17 @@ A landing page é estática: qualquer token no JavaScript dela seria legível po
 quem abrisse o inspetor. Então, em vez de fingir que é segredo, **aquela porta
 serve menos**.
 
-### `esp32/` — o firmware
+### A ponte BLE — hoje no Pi (o ESP32 foi removido)
 
-Uma ponte BLE ↔ Serial e nada mais. Valida que a linha é JSON e repassa; se não
+A ponte que recebe o Bluetooth do celular era um ESP32. **Ele foi removido** e
+tudo foi centralizado no Pi: hoje o próprio Pi anuncia o serviço BLE (no
+repositório da cara, `RobotEye`, em `src/roboteye/ble/`). Ver
+[`docs/setup-esp32.md`](./docs/setup-esp32.md).
+
+A ponte valida que a linha é JSON e publica em `robo/comando/entrada`; se não
 for, responde erro pela característica de notificação. **Não interpreta
-comandos** — não sabe o que é `"F"`.
-
-BLE e não Bluetooth Classic porque o app roda em iOS também, e o iOS nunca
-ofereceu SPP para apps de terceiros.
+comandos** — não sabe o que é `"F"`. BLE e não Bluetooth Classic porque o app
+roda em iOS também, e o iOS nunca ofereceu SPP para apps de terceiros.
 
 ---
 
@@ -235,7 +236,7 @@ Esta é a espinha do repositório. A fonte de verdade é
 
 | Tópico | Quem publica | Quem consome | Conteúdo |
 |---|---|---|---|
-| `robo/comando/entrada` | ponte BLE ou `serialIngestor` | `orquestrador` | o JSON cru vindo do app |
+| `robo/comando/entrada` | ponte BLE (no Pi) | `orquestrador` | o JSON cru vindo do app |
 | `robo/motores/comando` | `orquestrador` | `motores` | `{"acao":"mover","linear":…,"angular":…}` |
 | `robo/motores/status` | `motores` | telemetria | estado dos motores (retained) |
 | `robo/gps/posicao` | `gps` | telemetria | posição atual (retained) |
@@ -256,7 +257,7 @@ importante do repositório, e ela está implementada três vezes, de propósito:
 ```mermaid
 flowchart TB
     A["1. O app repete<br/>o mesmo comando a cada 300 ms<br/>enquanto o dedo esta no botao"]
-    B["2. A ponte avisa<br/>ESP32 e ponte do Pi publicam<br/>parada_emergencia ao perder o BLE"]
+    B["2. A ponte avisa<br/>a ponte BLE do Pi publica<br/>parada_emergencia ao perder o BLE"]
     C["3. Os motores vigiam<br/>1 s sem comando repetido = parar<br/>motores/vigia.py"]
     A --> B --> C
 ```
@@ -277,7 +278,7 @@ morrer no meio de um movimento?** E prefira sempre a resposta que para o robô.
 
 **1. Ninguém fala com ninguém — todos falam com o barramento.** Um serviço novo
 entra assinando um tópico, sem tocar em nenhum dos que já existem. É o que
-permite trocar o ESP32 pelo rádio do próprio Pi sem que `motores` saiba.
+permitiu centralizar a ponte BLE no próprio Pi sem que `motores` soubesse.
 
 **2. Quem decide o que vira histórico é um só.** Os serviços publicam o estado
 “vivo”; o `orquestrador` espelha para `robo/telemetria/*` o que deve persistir.
@@ -349,5 +350,5 @@ para confirmar.
 | [`docs/contrato-mqtt.md`](./docs/contrato-mqtt.md) | O formato exato de cada mensagem |
 | [`docs/setup-pi.md`](./docs/setup-pi.md) | Instalar os serviços no Raspberry Pi |
 | [`docs/setup-cloud.md`](./docs/setup-cloud.md) | Subir o broker, o banco, a API e o túnel |
-| [`docs/setup-esp32.md`](./docs/setup-esp32.md) | Gravar o firmware |
+| [`docs/setup-esp32.md`](./docs/setup-esp32.md) | ESP32 removido — a ponte BLE foi centralizada no Pi |
 | [`CLAUDE.md`](./CLAUDE.md) | Convenções do repositório |

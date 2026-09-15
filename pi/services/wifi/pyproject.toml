@@ -1,7 +1,7 @@
 [project]
 name = "wifi"
 version = "0.1.0"
-description = "Provisionamento de Wi-Fi do robô: recebe SSID e senha pelo barramento MQTT (comando vindo do app via ESP32) e aplica com nmcli."
+description = "Provisionamento de Wi-Fi do robô: recebe SSID e senha pelo barramento MQTT (comando vindo do app via BLE) e aplica com nmcli."
 requires-python = ">=3.11"
 dependencies = [
     # Sem dependências externas: usa só a stdlib (subprocess para o nmcli) e a

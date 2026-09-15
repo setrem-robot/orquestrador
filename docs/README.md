@@ -22,12 +22,11 @@ quinze minutos. Aqui ficam os detalhes, separados por onde a coisa roda.
 
 ## O robô
 
-- [**Setup no Raspberry Pi**](./setup-pi.md) — dependências, os seis serviços
+- [**Setup no Raspberry Pi**](./setup-pi.md) — dependências, os cinco serviços
   em Python (incluindo `telemetria`, a saúde do Pi) e o broker local.
-- [**Setup do ESP32**](./setup-esp32.md) — compilar e gravar o firmware da
-  ponte Bluetooth. *Herdado:* com o Pi 5 tendo Bluetooth próprio, a ponte
-  passou a rodar no próprio Pi, no [repositório da
-  cara](https://github.com/setrem-robot/atlas_ai_v2).
+- [**ESP32 — removido**](./setup-esp32.md) — o ESP32 saiu do projeto; a ponte
+  Bluetooth foi centralizada no próprio Pi (no [repositório da
+  cara](https://github.com/setrem-robot/atlas_ai_v2)).
 
 ## Fora deste repositório
 

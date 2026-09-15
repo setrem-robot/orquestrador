@@ -4,7 +4,7 @@ Este módulo NÃO conhece MQTT: ele só transforma um comando (dict já
 desserializado) numa lista de publicações (tópico, payload). Isso o torna
 trivial de testar e mantém a lógica de decisão separada da infraestrutura.
 
-Formatos de entrada aceitos (Bluetooth -> ESP32 -> serialIngestor):
+Formatos de entrada aceitos (app -> Bluetooth -> Pi -> robo/comando/entrada):
 
   Formato compacto (app atual):
     {"cmd": "F"}   frente     {"cmd": "B"}   trás
@@ -155,7 +155,7 @@ class ComandoRota(ComandoRoteavel):
     """tipo: "rota" — a rota segura planejada no app, entregue fatiada.
 
     A rota chega em mensagens separadas, não numa só: cada linha BLE é limitada
-    a 512 bytes pelo firmware do ESP32, e uma rota com muitos pontos não caberia.
+    a 512 bytes pela ponte BLE do robô, e uma rota com muitos pontos não caberia.
     Então o app manda `inicio` (quantos pontos vêm), um `ponto` por waypoint e
     `fim`. Este roteador é sem estado — valida cada mensagem isoladamente e a
     republica em `robo/rota/comando`; quem remonta a rota inteira é o consumidor
@@ -221,8 +221,8 @@ class ComandoWifi(ComandoRoteavel):
     CAMPOS_REPASSADOS = ("ssid", "senha", "password")
 
     def rotear(self, cmd: dict[str, Any]) -> list[Publicacao]:
-        # A credencial chegou pelo mesmo caminho dos comandos (app -> ESP32 ->
-        # serial), pois o Pi não fala Bluetooth.
+        # A credencial chegou pelo mesmo caminho dos comandos (app -> Bluetooth
+        # -> Pi).
         payload: dict[str, Any] = {"acao": cmd.get("acao", "conectar")}
         for campo in self.CAMPOS_REPASSADOS:
             if campo in cmd:

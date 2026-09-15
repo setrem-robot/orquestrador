@@ -14,9 +14,7 @@ Toda mensagem é **JSON em uma linha**. A raiz de todos os tópicos é `robo`.
 App (celular)
    │  BLE (JSON por linha)
    ▼
-ESP32  ──(valida JSON, repassa por serial)──►  Pi
-                                                 │
-                          serialIngestor ──► robo/comando/entrada
+Ponte BLE no Pi ──(valida JSON)──► robo/comando/entrada
                                                  │
                                           orquestrador (roteia)
                               ┌──────────────────┼───────────────────┐
@@ -37,7 +35,7 @@ nuvem e persistido**. Quem decide o que entra nesse prefixo é o orquestrador.
 ## Comandos (entram do mundo externo)
 
 ### `robo/comando/entrada`
-Publicado pelo `serialIngestor` com o JSON cru recebido do app, sem
+Publicado pela ponte BLE do Pi com o JSON cru recebido do app, sem
 interpretação. Assinado pelo `orquestrador`.
 
 O orquestrador aceita dois formatos (ambos convivem sem conflito):
@@ -86,8 +84,8 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
   `pi/services/motores/src/motores/cinematica.py`.
 - `wifi.acao` ∈ `{conectar, listar, status}` (default `conectar`).
 - `rota.acao` ∈ `{inicio, ponto, fim}`. A **rota segura** é planejada no app e
-  entregue **fatiada**, porque uma linha BLE é limitada a 512 bytes pelo
-  firmware do ESP32 e uma rota com muitos pontos não caberia numa mensagem só. O
+  entregue **fatiada**, porque uma linha BLE é limitada a 512 bytes pela ponte
+  BLE do Pi e uma rota com muitos pontos não caberia numa mensagem só. O
   app manda `inicio` (com `total`, e `nome` opcional), um `ponto` por waypoint
   (`i` = índice ≥ 0, `lat`/`lon` na faixa geográfica válida) e `fim`. O
   orquestrador valida e republica cada mensagem em `robo/rota/comando` — ele é
@@ -105,26 +103,26 @@ o app repete o mesmo comando a cada **300 ms**; se o serviço de motores ficar
 
 Isso existe porque o comando de parar viaja pelo mesmo caminho que pode quebrar.
 O app manda `F` quando o dedo desce e `S` quando sobe; se a conexão morrer entre
-os dois — celular fora de alcance, sem bateria, app fechado, ESP32 travado, cabo
-serial solto —, o `S` nunca chega e o robô fica andando sozinho. Repetindo o
-comando, a ausência dele passa a ser um sinal em si.
+os dois — celular fora de alcance, sem bateria, app fechado, Bluetooth caindo —,
+o `S` nunca chega e o robô fica andando sozinho. Repetindo o comando, a ausência
+dele passa a ser um sinal em si.
 
 São três camadas independentes, e cada uma cobre o que a anterior não alcança:
 
 | Camada | Cobre | Onde |
 |---|---|---|
 | App repete o comando | qualquer falha no caminho, inclusive as de baixo | `robotConnection.dart::send` |
-| ESP32 manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `esp32BleBridge.ino::onDisconnect` |
-| Motores param sem comando por 1 s | ESP32 travado, serial solta, Pi sem receber | `motores/vigia.py` |
+| A ponte BLE manda `parada_emergencia` ao perder o BLE | celular sumiu; é a mais rápida | `RobotEye`, `ble/nus.py` (ao desconectar) |
+| Motores param sem comando por 1 s | ponte travada, Pi sem receber | `motores/vigia.py` |
 
 `COMANDO_TIMEOUT_S=0` desliga a terceira camada. **Só faça isso com um app que
 não repete o comando** — do contrário o robô para no meio de todo movimento. Um
 app antigo com um Pi atualizado tem exatamente esse sintoma, e o log do serviço
 `motores` diz isso com todas as letras.
 
-> **Tudo entra por um único caminho.** O app só tem um canal Bluetooth: o
-> ESP32. Não há Bluetooth no Pi. Logo, até a credencial de Wi-Fi viaja como um
-> comando comum (app → ESP32 → serial → `serialIngestor`).
+> **Tudo entra por um único caminho.** O app tem um canal Bluetooth: a ponte
+> BLE do Pi. Até a credencial de Wi-Fi viaja como um comando comum
+> (app → BLE → Pi → `robo/comando/entrada`).
 
 ## Domínio (saída do orquestrador)
 
@@ -210,8 +208,8 @@ para a nuvem:
 {"conectado": true, "ssid": "MinhaRede", "ip": "192.168.0.42", "ts": 1700000000}
 ```
 
-> O app recebe do ESP32 o `ack` de que o comando foi aceito. O resultado
-> detalhado da conexão (sucesso/IP) hoje só vai para o MQTT — não volta ao
-> celular, porque o firmware do ESP32 não tem canal serial→Bluetooth de
-> retorno. Se isso for desejável no futuro, basta o ESP32 repassar ao app o que
-> chegar na serial.
+> O app recebe pela característica de notificação BLE o `ack` de que o comando
+> foi aceito. O resultado detalhado da conexão (sucesso/IP) hoje só vai para o
+> MQTT — não volta ao celular. Como a ponte BLE agora roda no próprio Pi, dar
+> esse retorno é possível no futuro: bastaria a ponte republicar na
+> característica TX o que aparecer no MQTT.

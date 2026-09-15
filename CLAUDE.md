@@ -1,10 +1,15 @@
 # orquestrador — contexto para Claude Code
 
-Firmware do ESP32 + serviços Python do Raspberry Pi + ingestão de telemetria
-na nuvem. Para setup e o contrato MQTT completo, leia primeiro
+Serviços Python do Raspberry Pi + ingestão de telemetria na nuvem. Para setup
+e o contrato MQTT completo, leia primeiro
 **[`docs/README.md`](./docs/README.md)** (índice para `contrato-mqtt.md`,
-`setup-esp32.md`, `setup-pi.md`, `setup-cloud.md`). Este arquivo cobre o que
-essa documentação não cobre.
+`setup-pi.md`, `setup-cloud.md`). Este arquivo cobre o que essa documentação
+não cobre.
+
+> **O ESP32 foi removido**, e com ele o serviço `serial_ingestor`. Tudo foi
+> centralizado no Pi: a ponte Bluetooth passou a rodar no próprio Pi (no
+> repositório da cara, `RobotEye`, em `src/roboteye/ble/`). Ver
+> [`docs/setup-esp32.md`](./docs/setup-esp32.md).
 
 **Como o repositório funciona, ponta a ponta:**
 [`COMO-FUNCIONA.md`](./COMO-FUNCIONA.md) — o caminho de um comando desde o dedo
@@ -18,16 +23,15 @@ que está **de fato** instalado no robô hoje, que não é o mesmo que o diagram
 mostra: os serviços do `pi/services/` **não** estão no Pi, e é por isso que um
 comando de direção chega em `robo/comando/entrada` e para ali.
 
-## As três frentes, uma frase cada
+## As frentes, uma frase cada
 
-- **`esp32/`** — firmware C++/Arduino. Ponte BLE ↔ Serial: valida JSON e
-  repassa, não interpreta comandos.
-- **`pi/services/`** — seis serviços Python independentes, cada um seu
+- **`pi/services/`** — cinco serviços Python independentes, cada um seu
   próprio `pyproject.toml`, todos instalados num venv compartilhado
-  (`pi/scripts/install.sh`) e rodando como serviço systemd: `serialIngestor`,
+  (`pi/scripts/install.sh`) e rodando como serviço systemd:
   `orquestrador` (o roteador), `motores`, `gps`, `wifi` e `telemetria` (saúde
   do Pi → `robo/telemetria/sistema`; o único já instalado no robô de produção).
-  Compartilham a lib `roboCommon` (tópicos MQTT + `MqttService`).
+  Compartilham a lib `roboCommon` (tópicos MQTT + `MqttService`). A ponte BLE
+  que recebe os comandos do app roda no repositório da cara (`RobotEye`).
 - **`cloud/`** — Mosquitto remoto + `ingestor` + TimescaleDB + **`api`** +
   **`cloudflared`**, via Docker Compose. Os três primeiros são o caminho de ida
   (robô → banco); os dois últimos são o de volta, que faltava: um celular não
@@ -76,13 +80,13 @@ faz `--limpar` nunca tocar em telemetria de verdade.
 
 ## BLE, não Bluetooth Classic
 
-O firmware em `esp32/esp32BleBridge/` substituiu `esp32/esp32_bt_bridge/`
-(removido). Motivo: o app Flutter agora roda em iOS também, e o iOS nunca
-ofereceu Bluetooth Classic (SPP) para apps de terceiros. Os UUIDs do serviço
-BLE (padrão Nordic UART Service, no topo do `.ino`) **precisam bater** com
-`RobotBleIds` em `../app/lib/services/robotConnection.dart`. A validação de
-JSON e o formato de mensagem (`{"cmd":"F"}\n`) continuam idênticos — só o
-transporte mudou.
+A ponte usa BLE (Nordic UART Service), não Bluetooth Classic (SPP): o app
+Flutter roda em iOS também, e o iOS nunca ofereceu SPP para apps de terceiros.
+A ponte roda no próprio Pi (repositório `RobotEye`, `src/roboteye/ble/`) — o
+ESP32 que a fazia foi removido. Os UUIDs do serviço BLE **precisam bater** entre
+`RobotBleIds` em `../app/lib/services/robotConnection.dart` e
+`RobotEye/src/roboteye/ble/nus.py`. A validação de JSON e o formato de mensagem
+(`{"cmd":"F"}\n`) são os de sempre.
 
 ## Segurança: movimento é repetido, silêncio é "pare"
 
@@ -91,8 +95,9 @@ cada 300 ms enquanto o dedo está no botão; `motores/vigia.py` para os motores 
 ficar 1 s sem receber nada. Antes disso, uma conexão que morresse com o dedo no
 botão deixava o robô andando sozinho — o `S` do "dedo levantou" nunca chegava.
 
-São três camadas independentes (app repete, ESP32 avisa ao perder o BLE, motores
-vigiam o silêncio); o quadro completo está em `docs/contrato-mqtt.md`. Ao mexer
+São três camadas independentes (app repete, a ponte BLE avisa ao perder a
+conexão, motores vigiam o silêncio); o quadro completo está em
+`docs/contrato-mqtt.md`. Ao mexer
 em qualquer ponto desse caminho, pergunte **o que acontece se isto morrer no meio
 de um movimento** — e prefira a resposta que para o robô.
 
@@ -187,7 +192,7 @@ cd pi/services/motores && PYTHONPATH="src:../_common/src" python -m unittest dis
 
 ## Ambiente desta máquina
 
-Sem hardware real aqui (sem ESP32 conectado, sem Raspberry Pi, sem steppers).
+Sem hardware real aqui (sem Raspberry Pi, sem steppers).
 `roteador.py` e as duas camadas de baixo de `motores/` são testáveis porque não
-tocam hardware; `gps`, `wifi` e o `serialIngestor` só são validáveis de verdade
-no Pi físico ou com mocks que ninguém escreveu ainda.
+tocam hardware; `gps` e `wifi` só são validáveis de verdade no Pi físico ou com
+mocks que ninguém escreveu ainda.

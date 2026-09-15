@@ -23,7 +23,7 @@ Os três repositórios (são pastas irmãs de onde este arquivo mora):
 | Repositório | Apelido | O que é |
 |---|---|---|
 | [`atlas_ai_v2`](../RobotEye) (RobotEye) | a **cara** | face animada em pygame, IA (Ollama), voz (TTS/STT) e a ponte BLE que roda no Pi |
-| [`orquestrador`](.) | o **corpo** | firmware do ESP32, serviços Python do Raspberry Pi (motores, GPS, Wi-Fi) e a nuvem |
+| [`orquestrador`](.) | o **corpo** | serviços Python do Raspberry Pi (motores, GPS, Wi-Fi) e a nuvem |
 | [`aplicativo`](../app) | o **controle** | app Flutter (Android/iOS) para dirigir o robô e ver a telemetria |
 
 ---
@@ -51,8 +51,8 @@ Ou seja: **a cara está instalada, e do corpo só a telemetria.** O serviço
 `robo/telemetria/sistema`, e o Mosquitto do `apt` a espelha para a nuvem por
 *bridge* — é o que hoje enche o banco e alimenta o painel `/completo/`. O resto
 do `pi/services/` ainda **não** está instalado: nenhum `motores`,
-`orquestrador`, `gps`, `wifi` ou `serialIngestor` está registrado no systemd,
-e é por isso que o robô continua sem andar.
+`orquestrador`, `gps` ou `wifi` está registrado no systemd, e é por isso que o
+robô continua sem andar.
 
 O efeito prático, seguindo o caminho de um comando de direção:
 
@@ -121,7 +121,7 @@ flowchart TB
 
     subgraph PI["RASPBERRY PI"]
         direction TB
-        PONTE["Ponte BLE<br/>ESP32 ou o proprio Pi"]
+        PONTE["Ponte BLE<br/>no proprio Pi"]
         BROKER[("mosquitto :1883")]
         ROT["orquestrador<br/>o roteador"]
         MOT["motores"]
@@ -184,15 +184,14 @@ Para entender cada repositório por dentro, há um passeio guiado em cada um:
   direção é `withoutResponse` — o próximo já vem a caminho).
 - **Formato:** uma linha JSON por mensagem, terminada em `\n`. Ex.: `{"cmd":"F"}`
   (frente) e, agora, a rota segura fatiada (ver §3).
-- **Quem é a ponte:** ou o **ESP32** (`orquestrador/esp32/esp32BleBridge`), ou
-  o **próprio Pi** (`../RobotEye/src/roboteye/ble/`). Qualquer um dos dois valida o
-  JSON e publica em `robo/comando/entrada`. **Só um deve estar ativo por vez.**
+- **Quem é a ponte:** o **próprio Pi** (`../RobotEye/src/roboteye/ble/`), que
+  valida o JSON e publica em `robo/comando/entrada`. (Antes era um **ESP32**;
+  ele foi removido e a ponte centralizada no Pi.)
 - **⚠️ Contrato que precisa bater nos dois lados:** os UUIDs do serviço BLE.
   - App: `RobotBleIds` em `../app/lib/services/robotConnection.dart`
     (`serviceUuid = 6e400001-b5a3-f393-e0a9-e50e24dcca9e`, RX `…0002`, TX `…0003`).
-  - ESP32: no topo de `esp32/esp32BleBridge/*.ino`.
   - Pi: `../RobotEye/src/roboteye/ble/nus.py`.
-  - **Mudou um, muda os três** — senão o celular não acha o robô, ou acha e
+  - **Mudou um, muda o outro** — senão o celular não acha o robô, ou acha e
     nada chega.
 
 ### 2.2 Dentro do Pi — **MQTT (Mosquitto, porta 1883)**
@@ -204,7 +203,7 @@ Para entender cada repositório por dentro, há um passeio guiado em cada um:
 
 | Tópico | Quem publica | Quem consome | Conteúdo |
 |---|---|---|---|
-| `robo/comando/entrada` | ponte BLE (ESP32 ou Pi) | orquestrador | o JSON cru vindo do app |
+| `robo/comando/entrada` | ponte BLE (no Pi) | orquestrador | o JSON cru vindo do app |
 | `robo/motores/comando` | orquestrador | serviço `motores` | `{"acao":"mover","linear":…,"angular":…}` |
 | `robo/motores/status` | `motores` | telemetria | estado dos motores |
 | `robo/voz/falar` | orquestrador | *(RobotEye, futuro)* | texto para a Atlas falar |
@@ -252,7 +251,7 @@ rota, como gancho para um futuro serviço de navegação.
 
 ```
 App desenha waypoints dentro de uma cerca (geofence)
-   │  RotaSegura.paraMensagensBle()  →  fatia em linhas ≤512 B (limite do ESP32)
+   │  RotaSegura.paraMensagensBle()  →  fatia em linhas ≤512 B (limite da ponte BLE)
    ▼
 {"tipo":"rota","acao":"inicio","total":N,"nome":"…"}   ┐
 {"tipo":"rota","acao":"ponto","i":0,"lat":…,"lon":…}   │ BLE, uma linha por vez
@@ -271,8 +270,8 @@ robo/rota/comando   →   (nenhum consumidor hoje — gancho para navegação fu
   Só o `RobotConnection.enviarRota` fala com o rádio.
 - **Orquestrador:** `ComandoRota` em `pi/services/orquestrador/src/orquestrador/roteador.py`,
   tópico `ROTA_COMANDO` em `topics.py`, contrato em `docs/contrato-mqtt.md`.
-- **Por que fatiada:** uma linha BLE não passa de **512 bytes** no firmware do
-  ESP32. Cada linha da rota fica em ~65 bytes, com folga.
+- **Por que fatiada:** uma linha BLE não passa de **512 bytes** na ponte BLE do
+  Pi. Cada linha da rota fica em ~65 bytes, com folga.
 - **Segurança:** a cerca (um círculo em volta da partida) impede desenhar rota
   que sai da área combinada; e o orquestrador descarta coordenada/índice inválidos,
   porque a origem (o app) é entrada não-confiável.
@@ -283,7 +282,7 @@ robo/rota/comando   →   (nenhum consumidor hoje — gancho para navegação fu
 
 Estes são os pontos onde **mudar um lado sem o outro quebra em silêncio**:
 
-1. **UUIDs BLE** — app (`RobotBleIds`), ESP32 (`.ino`) e Pi (`ble/nus.py`). §2.1.
+1. **UUIDs BLE** — app (`RobotBleIds`) e Pi (`ble/nus.py`). §2.1.
 2. **Nomes de tópicos MQTT** — sempre de `roboCommon/topics.py`. §2.2.
 3. **Formato das mensagens de comando** — `{"cmd":"X"}` e `{"tipo":"…",…}`,
    documentado em `docs/contrato-mqtt.md`.
@@ -301,18 +300,15 @@ Estes são os pontos onde **mudar um lado sem o outro quebra em silêncio**:
   broker: o app conecta, os comandos chegam ao Pi e o robô **não se mexe** —
   porque uma das pontas publica num broker que ninguém escuta. Escolha **uma**
   fonte de Mosquitto.
-- **⚠️ Duas pontes BLE.** ESP32 **ou** o Pi anunciam o serviço — nunca os dois ao
-  mesmo tempo, senão o celular pareia com um e os comandos vão para o outro.
 - **`kotlin.incremental=false`** no `app/android/gradle.properties` é necessário
   para buildar de um drive montado (`D:\` no WSL) — não remova.
 - **Trocar o ícone do app exige release novo** (recurso nativo; nenhum patch
   Shorebird o entrega).
-- **⚠️ O limite de uma linha BLE é 512 bytes nas duas pontes.** `MAX_LINE` no
-  `.ino` e `MAX_LINHA` em `../RobotEye/src/roboteye/ble/nus.py` já bateram 512 e
-  256: nenhuma mensagem de hoje chega perto (um ponto de rota tem ~65 bytes),
-  então a divergência não aparecia — apareceria na primeira mensagem entre 257 e
-  512 bytes, e apareceria **só numa das duas pontes**, que é o tipo de defeito
-  que se procura no lugar errado por um dia inteiro.
+- **⚠️ O limite de uma linha BLE é 512 bytes.** `MAX_LINHA` em
+  `../RobotEye/src/roboteye/ble/nus.py` precisa bater com o fatiamento do app
+  (`RotaSegura.paraMensagensBle`): uma mensagem maior seria recusada e a rota
+  chegaria pela metade. Nenhuma mensagem de hoje chega perto (um ponto de rota
+  tem ~65 bytes).
 - **⚠️ O número de uma placa de som muda entre reinicializações.** Vale para
   qualquer coisa que escreva `card N` num arquivo: no robô, o `ctl` do
   `/etc/asound.conf` apontava para `card 2` (uma saída HDMI) enquanto o dongle

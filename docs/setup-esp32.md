@@ -1,14 +1,36 @@
-# Setup do Firmware no ESP32
+# ESP32 — removido
 
-O setup da Ponte BLE via ESP32 é bem simples, sendo necessário apenas seguir o seguinte passo a passo: 
+> [!IMPORTANT]
+> **O ESP32 foi retirado do projeto.** Não há mais firmware para compilar nem
+> placa para gravar. Tudo foi **centralizado no Raspberry Pi**.
 
-- Fazer a instalação do [Arduino IDE](https://docs.arduino.cc/software/ide/)
-- Instalar as placas ESP32 no Arduino IDE [seguindo este tutorial](https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
-- Fazer a instalação da biblioteca `ArduinoJson` no Arduino IDE.
+## O que mudou
 
-As bibliotecas `BLEDevice`, `BLEServer` e `BLEUtils` **não precisam de instalação separada**: já vêm junto com o pacote de placas ESP32 do Arduino IDE.
+Antes, o ESP32 era o gateway Bluetooth: o celular falava BLE com ele, que
+validava o JSON e repassava pela serial ao Pi (o serviço `serial-ingestor` lia
+essa serial e publicava em `robo/comando/entrada`).
 
-Após isso, é só selecionar a placa ESP32 que está sendo utilizda _(No caso dos exemplos está sendo usada a `ESP32-WROOM-DA`)_ e compilar o código em `esp32BleBridge/esp32BleBridge.ino`.
+Hoje o **próprio Pi** anuncia o serviço BLE (mesmo padrão Nordic UART Service,
+mesmos UUIDs, mesmo formato de mensagem). A ponte roda no repositório
+[`RobotEye`](https://github.com/setrem-robot/atlas_ai_v2) em
+`src/roboteye/ble/` e publica direto em `robo/comando/entrada` — sem serial e
+sem microcontrolador no meio.
 
-> [!NOTE]
-> Este firmware usa BLE (Bluetooth Low Energy) em vez de Bluetooth Classic (SPP). A troca foi feita para que o app Flutter funcione tanto em Android quanto em iOS — o iOS nunca ofereceu SPP para apps de terceiros. Veja os UUIDs do serviço no topo do `.ino` — eles precisam bater com os mesmos valores em `app/lib/services/robotConnection.dart`.
+Com isso saíram do projeto:
+
+- `esp32/` — o firmware C++/Arduino.
+- `pi/services/serial_ingestor/` — o serviço que lia a serial do ESP32.
+- a unidade `robo-serial-ingestor.service` e a flag `--com-esp32` do
+  `pi/scripts/install.sh`.
+
+## Como subir a ponte BLE hoje
+
+No próprio Pi, pelo repositório `RobotEye`:
+
+```bash
+./scripts/setup-raspberry-pi.sh --bluetooth-app --service
+```
+
+Os UUIDs do serviço continuam sendo o contrato entre os dois lados e precisam
+bater: `RobotBleIds` em `app/lib/services/robotConnection.dart` **e**
+`src/roboteye/ble/nus.py` no `RobotEye`.

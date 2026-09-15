@@ -6,8 +6,8 @@
 > [`MAPA-COMUNICACAO.md`](./MAPA-COMUNICACAO.md).
 
 Este repositório é a parte da Atlas que **se move, se localiza e se comunica**:
-os serviços que rodam no Raspberry Pi, o firmware do ESP32 e a nuvem que guarda
-e serve a telemetria.
+os serviços que rodam no Raspberry Pi e a nuvem que guarda e serve a
+telemetria.
 
 A Atlas é um robô autônomo do curso de Engenharia de Computação da SETREM, e
 está espalhada por três repositórios:
@@ -199,7 +199,6 @@ instalados num ambiente compartilhado e rodando como serviço do systemd:
 | `motores` | cinemática, rampa de aceleração e os drivers TMC2209 |
 | `gps` | lê o módulo e publica posição |
 | `wifi` | troca de rede sem cabo nem teclado |
-| `serialIngestor` | recebe do ESP32 pela serial (herdado; hoje o BLE roda no próprio Pi) |
 
 Os motores são três camadas, e **as duas de baixo rodam sem robô**: a cinemática
 é matemática pura, e o acionamento tem uma implementação simulada
@@ -220,12 +219,12 @@ lá você para de passar o `compose.local.yml`, e troca as senhas. Nada mais.
 
 → [`docs/setup-cloud.md`](./docs/setup-cloud.md) · [`docs/ambiente-local.md`](./docs/ambiente-local.md)
 
-### `esp32/` — a ponte Bluetooth (herdada)
+### A ponte Bluetooth — centralizada no Pi
 
-Firmware C++/Arduino que faz ponte BLE ↔ Serial. **Está sendo aposentado:** com
-o Raspberry Pi 5 tendo Bluetooth próprio, a ponte passou a rodar no próprio Pi,
-no repositório da cara. O firmware continua aqui porque ainda funciona e serve
-de reserva.
+Antes era um ESP32 que fazia a ponte BLE ↔ Serial. **Ele foi removido:** com o
+Raspberry Pi 5 tendo Bluetooth próprio, a ponte passou a rodar no próprio Pi
+(no repositório da cara, `RobotEye`, em `src/roboteye/ble/`). Não há mais
+firmware neste repositório.
 
 → [`docs/setup-esp32.md`](./docs/setup-esp32.md)
 
@@ -273,7 +272,7 @@ cd cloud/api && python3 -m pytest -q tests/  # 27 testes
 | [`docs/ambiente-local.md`](./docs/ambiente-local.md) | a nuvem inteira na sua máquina, e como levar para a VM |
 | [`docs/setup-cloud.md`](./docs/setup-cloud.md) | a VM: broker, banco, ingestor, API e o túnel da Cloudflare |
 | [`docs/setup-pi.md`](./docs/setup-pi.md) | o Raspberry Pi: dependências, serviços e broker local |
-| [`docs/setup-esp32.md`](./docs/setup-esp32.md) | compilar e gravar o firmware da ponte |
+| [`docs/setup-esp32.md`](./docs/setup-esp32.md) | ESP32 removido — a ponte BLE foi centralizada no Pi |
 | [`site/README.md`](./site/README.md) | publicar a landing page |
 
 ---
