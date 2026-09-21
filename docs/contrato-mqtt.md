@@ -71,6 +71,7 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
 {"tipo": "rota", "acao": "inicio", "total": 4, "nome": "volta-quadra"}
 {"tipo": "rota", "acao": "ponto", "i": 0, "lat": -28.2612, "lon": -54.0234}
 {"tipo": "rota", "acao": "fim"}
+{"tipo": "ia", "modo": "nuvem"}
 ```
 
 - `motor.acao` ∈ `{frente, tras, esquerda, direita, parar, mover}`;
@@ -91,6 +92,14 @@ O orquestrador normaliza internamente para o formato expandido com velocidade pa
   orquestrador valida e republica cada mensagem em `robo/rota/comando` — ele é
   **sem estado**: quem remonta a rota inteira é o consumidor. Pontos com
   coordenada fora do planeta ou índice malformado são descartados.
+- `ia.modo` ∈ `{local, nuvem}`. **É o único comando consumido pela cara
+  (`RobotEye`), e não pelo orquestrador.** Troca qual modelo de linguagem
+  responde: `local` (o modelo do próprio Pi, offline e mais rápido) ou `nuvem`
+  (o modelo maior da rede, com queda automática para o local se ela cair). O
+  switch fica na tela de controle do app. O RobotEye assina
+  `robo/comando/entrada` direto e aplica — não precisa do roteador do
+  orquestrador no ar, que aliás descarta este tipo como qualquer outro que não
+  seja dele. Ver `RobotEye/src/roboteye/core/controle.py`.
 - Comandos desconhecidos ou malformados são descartados (logados, não derrubam
   o serviço).
 
