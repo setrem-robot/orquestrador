@@ -297,11 +297,10 @@ um motor de verdade com esse código.
 está montado no robô. É por isso que os dados de trajeto que você vê hoje vêm do
 robô falso.
 
-**A nuvem na VM do LARCC.** Está tudo pronto e testado, rodando na máquina de
-mesa de um dos integrantes. Migrar é parar de passar um arquivo e trocar as
-senhas — o passo a passo está em [`docs/ambiente-local.md`](./docs/ambiente-local.md),
-seção 6. Enquanto isso não acontece, a API pública só responde com aquela
-máquina ligada.
+**A nuvem na VM do LARCC — feito em 02/10/2026.** A pilha inteira (`cloud/` e o
+`site/`) roda na VM do LARCC, e o túnel da Cloudflare sai de lá. O Pi alcança o
+broker da VM pela **Tailscale**, de qualquer rede — ver
+[`docs/setup-cloud.md`](./docs/setup-cloud.md), "Como o Pi alcança a VM".
 
 **A Atlas não fala o que o app manda.** Existe o tópico `robo/voz/falar`, e nada
 o escuta: o repositório da cara ainda não reage a MQTT. Do mesmo jeito, ela não

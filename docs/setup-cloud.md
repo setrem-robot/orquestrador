@@ -133,6 +133,24 @@ Para ver de que lado está o problema, no Pi:
 Ele diz se a bridge está ligada, quantas mensagens estão esperando na fila e
 qual foi o último valor de cada tipo.
 
+### Como o Pi alcança a VM
+
+A VM do LARCC não tem porta aberta para a internet, e o MQTT não deveria ter.
+O Pi e a VM estão na mesma rede **Tailscale**: a bridge aponta para o IP
+Tailscale da VM (`100.x.y.z:1883`), e a conexão funciona com o robô no cabo de
+casa, no Wi-Fi do campus ou no 4G — sem expor a 1883 e sem depender da LAN.
+
+```bash
+# no Pi, uma vez
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --hostname=atlas-pi    # abre um link para aprovar na conta
+tailscale ping <nome-da-vm>              # confere o caminho
+```
+
+Depois, `address <ip-tailscale-da-vm>:1883` no `bridge.conf` e
+`sudo systemctl restart mosquitto`. O log do broker da VM deve mostrar
+`New bridge connected ... as atlas.bridge-telemetria`.
+
 ### Um broker, não dois
 
 O Pi pode acabar com **dois** Mosquitto instalados, e os dois querem a porta

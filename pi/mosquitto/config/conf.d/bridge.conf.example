@@ -12,7 +12,9 @@
 # Nome lógico desta conexão de bridge (aparece nos logs).
 connection bridge-telemetria
 
-# Endereço do broker remoto.
+# Endereço do broker remoto. Na VM do LARCC, use o IP Tailscale dela
+# (100.x.y.z): o Pi entra na mesma Tailscale e alcança a VM de qualquer rede,
+# sem porta aberta na internet. Ver docs/setup-cloud.md, "Como o Pi alcança a VM".
 address SUBSTITUA_VM_HOST:1883
 
 bridge_protocol_version mqttv311
